@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Игра "Проект Феникс"</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Уровень 4: Проект "Феникс"</h1>
+    <div id="game-container">
+        <div id="game-stats">
+            <div id="progress-tracker">Проектов сдано: <span id="delivered-count">0</span> / 10</div>
+            <div id="day-counter">День: <span id="day-count">1</span></div>
+            <div id="defects-leaked">Дефектов пропущено: <span id="leaked-count">0</span> / 5</div>
+        </div>
+        <div id="main-content">
+            <div id="pipeline">
+                <div class="stage" id="dev">
+                    <h2>Разработка</h2>
+                    <div class="work-items"></div>
+                </div>
+                <div class="stage" id="ops">
+                    <h2>Эксплуатация</h2>
+                    <div class="work-items"></div>
+                </div>
+                <div class="stage" id="customer">
+                    <h2>Заказчик</h2>
+                    <div class="work-items"></div>
+                </div>
+            </div>
+            <div id="tooling-panel">
+                <h2>Инструменты и Автоматизация</h2>
+                <p>Инвестируйте 'Внутренние проекты', чтобы выжить!</p>
+                <div id="tool-upgrades">
+                    <div class="upgrade" id="automated-testing">Автоматизированное тестирование</div>
+                    <div class="upgrade" id="ci-cd-pipeline">CI/CD Конвейер</div>
+                    <div class="upgrade" id="monitoring">Мониторинг</div>
+                </div>
+            </div>
+        </div>
+        <div id="controls">
+            <button id="add-business-project-btn">Начать бизнес-проект</button>
+            <button id="add-internal-project-btn">Начать внутренний проект</button>
+            <button id="restart-btn" style="display: none;">Начать заново</button>
+        </div>
+        <div id="info-box">
+             <p><strong>Ваша цель:</strong> Сдать 10 бизнес-проектов, прежде чем 5 дефектов попадут к заказчику. Время не ждёт!</p>
+             <div id="notifications"></div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
