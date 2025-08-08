@@ -216,4 +216,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Start Game ---
     initGame();
+
+    // --- Frontend Game Loop ---
+    // Poll the backend for updates every 2 seconds
+    setInterval(async () => {
+        const response = await fetch('/api/game_state');
+        const gameState = await response.json();
+        renderState(gameState);
+    }, 2000);
 });
