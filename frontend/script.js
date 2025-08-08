@@ -184,10 +184,38 @@ document.addEventListener('DOMContentLoaded', () => {
         stageEl.addEventListener('dragover', e => e.preventDefault());
         stageEl.addEventListener('drop', handleStageDrop);
     });
-    // upgrades.forEach(upgrade => {
-    //     upgrade.addEventListener('dragover', e => e.preventDefault());
-    //     // upgrade.addEventListener('drop', handleUpgradeDrop); // To be implemented
-    // });
+    upgrades.forEach(upgrade => {
+        upgrade.addEventListener('dragover', e => e.preventDefault());
+        upgrade.addEventListener('drop', handleUpgradeDrop);
+    });
+
+    async function handleUpgradeDrop(e) {
+        e.preventDefault();
+        const itemId = e.dataTransfer.getData('text/plain');
+        const toolId = e.target.closest('.upgrade').id;
+
+        // Basic frontend validation to prevent obviously wrong API calls
+        const itemEl = document.getElementById(itemId);
+        if (!itemEl || !itemEl.classList.contains('internal')) {
+            showNotification("Только 'Внутренние проекты' могут быть использованы для улучшений!", 'error');
+            return;
+        }
+
+        const response = await fetch('/api/purchase_upgrade', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ itemId, toolId }),
+        });
+
+        if (response.ok) {
+            const newState = await response.json();
+            renderState(newState);
+            showNotification(`${i18n.notifications.upgraded}${i18n.upgradeNames[toolId]}!`, 'success');
+        } else {
+            const error = await response.json();
+            showNotification(`Не удалось улучшить: ${error.error}`, 'error');
+        }
+    }
 
     async function handleStageDrop(e) {
         e.preventDefault();
@@ -213,6 +241,53 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+
+    const chatMessages = document.getElementById('chat-messages');
+    const chatInput = document.getElementById('chat-input');
+    const chatSendBtn = document.getElementById('chat-send-btn');
+
+    // --- Event Listeners ---
+    chatSendBtn.addEventListener('click', handleSendMessage);
+    chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            handleSendMessage();
+        }
+    });
+
+    async function handleSendMessage() {
+        const message = chatInput.value.trim();
+        if (!message) return;
+
+        // Display user message
+        addChatMessage(message, 'user');
+        chatInput.value = '';
+
+        // Display thinking message
+        const thinkingMessage = addChatMessage('Думаю...', 'ai');
+
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message }),
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+            thinkingMessage.innerText = data.reply;
+        } else {
+            thinkingMessage.innerText = `Ошибка: ${data.error}`;
+            thinkingMessage.style.color = 'red';
+        }
+    }
+
+    function addChatMessage(text, sender) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `chat-message ${sender}`;
+        msgDiv.innerText = text;
+        chatMessages.appendChild(msgDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight; // Auto-scroll
+        return msgDiv;
+    }
 
     // --- Start Game ---
     initGame();
