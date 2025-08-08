@@ -1,0 +1,172 @@
+body {
+    font-family: sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    margin: 0;
+    background-color: #f0f0f0;
+}
+
+h1 {
+    color: #333;
+}
+
+#game-stats {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 15px;
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+#game-container {
+    width: 95%;
+    max-width: 1200px;
+    height: 700px;
+    border: 2px solid #333;
+    background-color: #fff;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+}
+
+#main-content {
+    display: flex;
+    flex-grow: 1;
+    margin-bottom: 20px;
+}
+
+#pipeline {
+    display: flex;
+    justify-content: space-between;
+    flex-grow: 1;
+    margin-right: 20px;
+}
+
+#tooling-panel {
+    width: 250px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 10px;
+    background-color: #f9f9f9;
+}
+
+#tooling-panel h2 {
+    text-align: center;
+    margin-top: 0;
+}
+
+.upgrade {
+    padding: 10px;
+    margin: 10px 0;
+    background-color: #d0e0f0;
+    border: 1px solid #99b;
+    border-radius: 3px;
+    text-align: center;
+}
+
+.upgrade.purchased {
+    background-color: #b0d0b0;
+    border-color: #7a7;
+}
+
+.stage {
+    width: 30%;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 10px;
+    background-color: #f9f9f9;
+}
+
+.stage h2 {
+    text-align: center;
+    margin-top: 0;
+}
+
+.work-items {
+    min-height: 100px;
+}
+
+.work-item {
+    padding: 10px;
+    margin: 5px 0;
+    border: 1px solid #999;
+    border-radius: 3px;
+    cursor: pointer;
+    color: white;
+}
+
+.work-item.business { background-color: #2a9d8f; }
+.work-item.internal { background-color: #e9c46a; }
+.work-item.change { background-color: #f4a261; }
+.work-item.unplanned { background-color: #e76f51; font-weight: bold; }
+
+.work-item {
+    transition: all 0.3s ease-in-out;
+}
+
+#controls {
+    text-align: center;
+    margin-top: 10px; /* Use margin-top instead of margin-bottom on pipeline */
+}
+
+#info-box {
+    border: 1px solid #ccc;
+    padding: 10px;
+    background-color: #f0f8ff;
+    min-height: 50px;
+    position: relative;
+}
+
+#notifications {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    right: 10px;
+    font-style: italic;
+    color: #555;
+}
+
+.notification-message {
+    padding: 5px;
+    background-color: rgba(255, 255, 0, 0.5);
+    border-radius: 3px;
+    margin-top: 5px;
+    animation: fadeOut 5s forwards;
+}
+
+@keyframes fadeOut {
+    0% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+#legend {
+    margin-bottom: 10px;
+}
+
+#legend ul {
+    list-style: none;
+    padding: 0;
+}
+
+#legend li {
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+}
+
+.legend-color {
+    width: 20px;
+    height: 20px;
+    display: inline-block;
+    margin-right: 10px;
+    border: 1px solid #999;
+}
+
+.legend-color.business { background-color: #2a9d8f; }
+.legend-color.internal { background-color: #e9c46a; }
+.legend-color.change { background-color: #f4a261; }
+.legend-color.unplanned { background-color: #e76f51; }
