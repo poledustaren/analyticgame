@@ -107,29 +107,29 @@ button {
 }
 
 /* Стили для лога событий/чата */
-#chat-history-display {
-    margin-top: 20px;
-    padding: 15px;
-    background-color: #f9f9f9;
-    border-radius: 5px;
-    max-height: 150px;
-    overflow-y: auto;
-    border: 1px solid #e0e0e0;
-    font-size: 0.9em;
+#log-container {
+    padding: 20px;
 }
 
-#chat-history-display h3 {
+#log-container h3 {
     margin-top: 0;
     margin-bottom: 10px;
-    font-size: 1em;
+    font-size: 1.1em;
     color: #333;
     border-bottom: 1px solid #ddd;
-    padding-bottom: 5px;
+    padding-bottom: 10px;
 }
 
-#chat-history-display p {
+.log-content {
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 0.9em;
+    line-height: 1.5;
+    padding-right: 10px; /* для скроллбара */
+}
+
+.log-content p {
     margin: 0 0 8px 0;
-    line-height: 1.4;
 }
 
 /* Стили для Jira-доски */
@@ -199,4 +199,77 @@ button {
     font-size: 0.8em;
     color: #666;
     margin-top: 5px;
+}
+
+/* Стили для WIP-лимита */
+.wip-limit-control {
+    font-size: 0.7em;
+    font-weight: normal;
+    margin-left: 10px;
+}
+.wip-limit-control input {
+    width: 30px;
+}
+.wip-limit-control button {
+    padding: 2px 5px;
+    font-size: 0.9em;
+}
+
+/* Стили для модального окна и мини-игры */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    width: 600px;
+    text-align: center;
+}
+
+#minigame-area {
+    height: 300px;
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    margin-bottom: 15px;
+    position: relative;
+    overflow: hidden;
+}
+
+#minigame-queue {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80px;
+    display: flex;
+    flex-direction: column-reverse;
+}
+
+.minigame-task {
+    width: 80px;
+    height: 40px;
+    background-color: #ffc107;
+    border: 1px solid #d39e00;
+    border-radius: 3px;
+    margin-top: 5px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.minigame-task:hover {
+    background-color: #e0a800;
 }

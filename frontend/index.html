@@ -21,7 +21,14 @@
                     <h3>Backlog</h3>
                 </div>
                 <div class="jira-column" id="in_progress" data-column-id="in_progress">
-                    <h3>In Progress</h3>
+                    <h3>
+                        In Progress
+                        <span class="wip-limit-control">
+                            (WIP: <span id="wip-limit-display">99</span>)
+                            <input type="number" id="wip-limit-input" min="1" value="3" title="Установить WIP лимит">
+                            <button id="set-wip-limit-btn">Set</button>
+                        </span>
+                    </h3>
                 </div>
                 <div class="jira-column" id="review" data-column-id="review">
                     <h3>Review</h3>
@@ -38,5 +45,18 @@
     </div>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <script src="script.js"></script>
+
+    <!-- Модальное окно для мини-игры -->
+    <div id="minigame-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h2>Мини-игра: Балансировщик потока</h2>
+            <p>Кликните на задачу, чтобы "обработать" ее. Не дайте очереди переполниться!</p>
+            <div id="minigame-area">
+                <div id="minigame-queue"></div>
+            </div>
+            <div id="minigame-timer">Время: <span>30</span>с</div>
+            <button id="minigame-close-btn" style="display: none;">Завершить</button>
+        </div>
+    </div>
 </body>
 </html>
