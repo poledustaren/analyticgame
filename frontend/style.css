@@ -1,0 +1,202 @@
+body {
+    font-family: sans-serif;
+    margin: 0;
+    background-color: #f0f0f0;
+    padding: 20px;
+}
+
+#main-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+#game-container {
+    width: 100%;
+    height: fit-content;
+    border: 1px solid #ccc;
+    display: flex;
+    flex-direction: column;
+    background-color: white;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    box-sizing: border-box;
+}
+
+#metrics-display {
+    display: flex;
+    justify-content: space-around;
+    padding: 15px 10px;
+    border-bottom: 1px solid #ccc;
+    background-color: #f8f8f8;
+    flex-wrap: wrap;
+}
+
+.metric-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 5px 15px;
+    border-radius: 8px;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.metric-item .label {
+    font-size: 0.9em;
+    color: #555;
+    margin-bottom: 5px;
+}
+
+.metric-item .value {
+    font-size: 1.3em;
+    font-weight: bold;
+}
+
+/* Цветовая индикация */
+.metric-good {
+    color: #28a745;
+}
+
+.metric-ok {
+    color: #ffc107;
+}
+
+.metric-bad {
+    color: #dc3545;
+}
+
+
+#events-container {
+    padding: 20px;
+}
+
+.event-card {
+    background-color: #fff3cd;
+    border: 1px solid #ffeeba;
+    border-radius: 5px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.event-card.quiz {
+    background-color: #e2e3e5;
+    border-color: #d6d8db;
+}
+
+.event-card h3 {
+    margin-top: 0;
+    font-size: 1.2em;
+    color: #856404;
+}
+
+.event-card.quiz h3 {
+    color: #383d41;
+}
+
+.event-card p {
+    margin: 0 0 15px 0;
+}
+
+.event-choices button {
+    margin-right: 10px;
+}
+
+button {
+    padding: 10px 20px;
+    font-size: 1em;
+    cursor: pointer;
+}
+
+/* Стили для лога событий/чата */
+#chat-history-display {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #f9f9f9;
+    border-radius: 5px;
+    max-height: 150px;
+    overflow-y: auto;
+    border: 1px solid #e0e0e0;
+    font-size: 0.9em;
+}
+
+#chat-history-display h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 1em;
+    color: #333;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 5px;
+}
+
+#chat-history-display p {
+    margin: 0 0 8px 0;
+    line-height: 1.4;
+}
+
+/* Стили для Jira-доски */
+#jira-board-container {
+    width: 100%;
+    background-color: white;
+    padding: 20px;
+    border: 1px solid #ccc;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    border-radius: 8px;
+    box-sizing: border-box;
+}
+
+#gantt-chart {
+    height: 350px;
+}
+
+#gantt-chart-container {
+    width: 100%;
+    background-color: white;
+    padding: 20px;
+    border: 1px solid #ccc;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    border-radius: 8px;
+}
+
+#jira-board {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    min-height: 400px;
+}
+
+.jira-column {
+    flex: 1;
+    min-width: 200px;
+    background-color: #e9ecef;
+    border-radius: 5px;
+    padding: 10px;
+}
+
+.jira-column h3 {
+    margin-top: 0;
+    font-size: 1.1em;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #ccc;
+}
+
+.task-card {
+    background-color: #fff;
+    border-radius: 3px;
+    padding: 10px;
+    margin-bottom: 8px;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+    cursor: grab;
+}
+
+.task-card:active {
+    cursor: grabbing;
+}
+
+.task-card .title {
+    font-weight: bold;
+}
+
+.task-card .points {
+    font-size: 0.8em;
+    color: #666;
+    margin-top: 5px;
+}
