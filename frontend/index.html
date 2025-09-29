@@ -7,35 +7,61 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="main-container">
-        <div id="game-container">
-            <div id="metrics-display"></div>
-            <div id="events-container">
-                <!-- Активные события (кризисы, квизы) будут здесь -->
-            </div>
+    <!-- Экран главного меню (виден по умолчанию) -->
+    <div id="main-menu-container">
+        <h1>Проект Феникс: Симулятор</h1>
+        <div class="menu-box">
+            <button id="new-game-btn">Новая игра</button>
         </div>
-        <div id="jira-board-container">
-            <h2>Jira Доска</h2>
-            <div id="jira-board">
-                <div class="jira-column" id="backlog" data-column-id="backlog">
-                    <h3>Backlog</h3>
-                </div>
-                <div class="jira-column" id="in_progress" data-column-id="in_progress">
-                    <h3>In Progress</h3>
-                </div>
-                <div class="jira-column" id="review" data-column-id="review">
-                    <h3>Review</h3>
-                </div>
-                <div class="jira-column" id="done" data-column-id="done">
-                    <h3>Done</h3>
-                </div>
+        <div class="menu-box">
+            <h2>Загрузить игру</h2>
+            <div id="saves-list">
+                <!-- Сюда будут загружаться слоты сохранений -->
+                <p>Сохранений не найдено.</p>
             </div>
         </div>
     </div>
-    <div id="gantt-chart-container">
-        <h2>График Ганта</h2>
-        <div id="gantt-chart"></div>
+
+    <!-- Основной контейнер игры (скрыт по умолчанию) -->
+    <div id="app-container" style="display: none;">
+        <div id="game-controls">
+            <button id="save-game-btn">Сохранить игру (Слот 1)</button>
+            <button id="main-menu-btn">Главное меню</button>
+        </div>
+        <div id="main-container">
+            <div id="game-container">
+                <div id="metrics-display"></div>
+                <div id="events-container"></div>
+            </div>
+            <div id="jira-board-container">
+                <h2>Jira Доска</h2>
+                <div id="jira-board">
+                    <div class="jira-column" id="backlog" data-column-id="backlog"><h3>Backlog</h3></div>
+                    <div class="jira-column" id="in_progress" data-column-id="in_progress">
+                        <h3>In Progress <span class="wip-limit-control">(WIP: <span id="wip-limit-display"></span>) <input type="number" id="wip-limit-input" min="1" title="Установить WIP лимит"> <button id="set-wip-limit-btn">Set</button></span></h3>
+                    </div>
+                    <div class="jira-column" id="review" data-column-id="review"><h3>Review</h3></div>
+                    <div class="jira-column" id="done" data-column-id="done"><h3>Done</h3></div>
+                </div>
+            </div>
+        </div>
+        <div id="gantt-chart-container">
+            <h2>График Ганта</h2>
+            <div id="gantt-chart"></div>
+        </div>
     </div>
+
+    <!-- Модальное окно для мини-игры (без изменений) -->
+    <div id="minigame-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h2>Мини-игра: Балансировщик потока</h2>
+            <p>Кликните на задачу, чтобы "обработать" ее. Не дайте очереди переполниться!</p>
+            <div id="minigame-area"><div id="minigame-queue"></div></div>
+            <div id="minigame-timer">Время: <span>30</span>с</div>
+            <button id="minigame-close-btn" style="display: none;">Завершить</button>
+        </div>
+    </div>
+
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <script src="script.js"></script>
 </body>
