@@ -5,6 +5,48 @@ body {
     padding: 20px;
 }
 
+/* Стили для главного меню */
+#main-menu-container {
+    max-width: 600px;
+    margin: 50px auto;
+    padding: 20px;
+    background-color: white;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.menu-box {
+    margin-bottom: 20px;
+    padding: 20px;
+    border: 1px solid #e0e0e0;
+    border-radius: 5px;
+}
+
+#saves-list button {
+    display: block;
+    width: 100%;
+    margin-bottom: 10px;
+    text-align: left;
+}
+
+/* Стили для игровых контролов */
+#game-controls {
+    margin-bottom: 20px;
+    padding: 10px;
+    background-color: #343a40;
+    color: white;
+    border-radius: 5px;
+    display: flex;
+    gap: 15px;
+}
+
+#game-controls button {
+    background-color: #6c757d;
+    color: white;
+    border: none;
+}
+
 #main-container {
     display: flex;
     flex-direction: column;
@@ -88,8 +130,18 @@ body {
     color: #856404;
 }
 
-.event-card.quiz h3 {
+.event-card.quiz h3, .event-card.cab h3, .event-card.investment h3 {
     color: #383d41;
+}
+
+.event-card.cab {
+    background-color: #d1ecf1;
+    border-color: #bee5eb;
+}
+
+.event-card.investment {
+    background-color: #d4edda;
+    border-color: #c3e6cb;
 }
 
 .event-card p {

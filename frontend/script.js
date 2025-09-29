@@ -1,8 +1,16 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // --- Адрес бэкенда ---
+    // --- API & DOM ---
     const API_BASE_URL = 'http://127.0.0.1:5001/api';
 
-    // --- Элементы DOM ---
+    // Menu Screen
+    const mainMenuContainer = document.getElementById('main-menu-container');
+    const newGameBtn = document.getElementById('new-game-btn');
+    const savesList = document.getElementById('saves-list');
+
+    // App Screen
+    const appContainer = document.getElementById('app-container');
+    const saveGameBtn = document.getElementById('save-game-btn');
+    const mainMenuBtn = document.getElementById('main-menu-btn');
     const metricsDisplay = document.getElementById('metrics-display');
     const eventsContainer = document.getElementById('events-container');
     const wipLimitDisplay = document.getElementById('wip-limit-display');
@@ -13,64 +21,93 @@ document.addEventListener('DOMContentLoaded', () => {
     logContainer.id = 'log-container';
     document.getElementById('game-container').appendChild(logContainer);
 
-    /**
-     * Главная функция рендеринга.
-     */
-    function render(state) {
-        renderMetrics(state);
-        renderEvents(state.active_events);
-        renderJiraBoard(state);
-        renderGanttChart(state.tasks, state.week);
-        renderLog(state.chat_history);
+
+    // --- UI Переключатели ---
+    function showMainMenu() {
+        appContainer.style.display = 'none';
+        mainMenuContainer.style.display = 'block';
+        loadSavesList();
     }
 
-    /**
-     * Обновляет метрики.
-     */
-    function renderMetrics(state) {
-        const getColor = (val, good, bad) => (val >= good ? 'metric-good' : (val <= bad ? 'metric-bad' : 'metric-ok'));
-        metricsDisplay.innerHTML = `
-            <div class="metric-item"><span class="label">Неделя</span><span class="value">${state.week}</span></div>
-            <div class="metric-item"><span class="label">Бюджет</span><span class="value ${state.budget < 0 ? 'metric-bad' : ''}">$${state.budget.toLocaleString()}</span></div>
-            <div class="metric-item"><span class="label">Мораль</span><span class="value ${getColor(state.morale, 75, 45)}">${state.morale}%</span></div>
-            <div class="metric-item"><span class="label">Стабильность</span><span class="value ${getColor(state.stability, 80, 40)}">${state.stability}%</span></div>
-            <div class="metric-item"><span class="label">Незаплан. работа</span><span class="value ${getColor(100 - state.unplanned_work, 60, 20)}">${state.unplanned_work}%</span></div>
-            <div class="metric-item"><span class="label">Прогресс 'Феникса'</span><span class="value">${state.phoenix_progress}%</span></div>`;
+    function showGame() {
+        mainMenuContainer.style.display = 'none';
+        appContainer.style.display = 'block';
     }
 
-    /**
-     * Рендерит активные события.
-     */
-    function renderEvents(events) {
-        eventsContainer.innerHTML = '<h2>Активные события</h2>';
-        if (!events || events.length === 0) {
-            eventsContainer.innerHTML += '<p>Все спокойно... пока.</p>';
-            return;
+    // --- API Взаимодействия ---
+    async function loadSavesList() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/saves`);
+            const saves = await response.json();
+            savesList.innerHTML = '';
+            if (saves.length === 0) {
+                savesList.innerHTML = '<p>Сохранений не найдено.</p>';
+                return;
+            }
+            saves.forEach(saveFile => {
+                const slotId = saveFile.replace('save_', '').replace('.json', '');
+                const button = document.createElement('button');
+                button.textContent = `Загрузить Слот ${slotId}`;
+                button.dataset.slotId = slotId;
+                button.onclick = () => loadGame(slotId);
+                savesList.appendChild(button);
+            });
+        } catch (error) {
+            console.error("Ошибка загрузки списка сохранений:", error);
+            savesList.innerHTML = '<p>Ошибка загрузки списка.</p>';
         }
-        events.forEach(event => {
-            const card = document.createElement('div');
-            card.className = 'event-card ' + event.type;
-            let choicesHtml = event.choices.map(c => `<button data-event-id="${event.id}" data-choice-id="${c.id}" class="choice-button">${c.text}</button>`).join('');
-            card.innerHTML = `<h3>${event.title}</h3><p>${event.text}</p><div class="event-choices">${choicesHtml}</div>`;
-            eventsContainer.appendChild(card);
-        });
     }
 
-    /**
-     * Рендерит лог событий.
-     */
-    function renderLog(chatHistory) {
-        logContainer.innerHTML = '<h3>Лог событий</h3>';
-        const logContent = document.createElement('div');
-        logContent.className = 'log-content';
-        logContent.innerHTML = chatHistory.map(msg => `<p><b>${msg.sender}:</b> ${msg.text}</p>`).join('');
-        logContainer.appendChild(logContent);
-        logContent.scrollTop = logContent.scrollHeight;
+    async function newGame() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/new_game`, { method: 'POST' });
+            const state = await response.json();
+            if (state.error) throw new Error(state.error);
+            render(state);
+            showGame();
+        } catch (error) {
+            console.error("Ошибка при начале новой игры:", error);
+            alert("Не удалось начать новую игру.");
+        }
     }
 
-    /**
-     * Универсальная функция для отправки действий на бэкенд.
-     */
+    async function saveGame(slotId) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/save_game`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ slot_id: slotId }),
+            });
+            const result = await response.json();
+            if (result.success) {
+                alert(result.message);
+                loadSavesList();
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error) {
+            console.error("Ошибка сохранения игры:", error);
+            alert("Не удалось сохранить игру.");
+        }
+    }
+
+    async function loadGame(slotId) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/load_game`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ slot_id: slotId }),
+            });
+            const state = await response.json();
+            if (state.error) throw new Error(state.error);
+            render(state);
+            showGame();
+        } catch (error) {
+            console.error("Ошибка загрузки игры:", error);
+            alert("Не удалось загрузить игру.");
+        }
+    }
+
     async function sendAction(actionData) {
         try {
             const response = await fetch(`${API_BASE_URL}/action`, {
@@ -87,9 +124,56 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    /**
-     * Обрабатывает клики по кнопкам действий (рефакторинг для ясности).
-     */
+    // --- Основная логика рендеринга ---
+    function render(state) {
+        if (!state || state.error) {
+            alert(state.error || "Произошла ошибка состояния игры.");
+            showMainMenu();
+            return;
+        }
+        renderMetrics(state);
+        renderEvents(state.active_events);
+        renderJiraBoard(state);
+        renderGanttChart(state.tasks, state.week);
+        renderLog(state.chat_history);
+    }
+
+    function renderMetrics(state) {
+        const getColor = (val, good, bad) => (val >= good ? 'metric-good' : (val <= bad ? 'metric-bad' : 'metric-ok'));
+        metricsDisplay.innerHTML = `
+            <div class="metric-item"><span class="label">Уровень</span><span class="value">${state.level}</span></div>
+            <div class="metric-item"><span class="label">Неделя</span><span class="value">${state.week}</span></div>
+            <div class="metric-item"><span class="label">Бюджет</span><span class="value ${state.budget < 0 ? 'metric-bad' : ''}">$${state.budget.toLocaleString()}</span></div>
+            <div class="metric-item"><span class="label">Мораль</span><span class="value ${getColor(state.morale, 75, 45)}">${state.morale}%</span></div>
+            <div class="metric-item"><span class="label">Стабильность</span><span class="value ${getColor(state.stability, 80, 40)}">${state.stability}%</span></div>
+            <div class="metric-item"><span class="label">Незаплан. работа</span><span class="value ${getColor(100 - state.unplanned_work, 60, 20)}">${state.unplanned_work}%</span></div>
+            <div class="metric-item"><span class="label">Прогресс 'Феникса'</span><span class="value">${state.phoenix_progress}%</span></div>`;
+    }
+
+    function renderEvents(events) {
+        eventsContainer.innerHTML = '<h2>Активные события</h2>';
+        if (!events || events.length === 0) {
+            eventsContainer.innerHTML += '<p>Все спокойно... пока.</p>';
+            return;
+        }
+        events.forEach(event => {
+            const card = document.createElement('div');
+            card.className = 'event-card ' + event.type;
+            let choicesHtml = event.choices.map(c => `<button data-event-id="${event.id}" data-choice-id="${c.id}" class="choice-button">${c.text}</button>`).join('');
+            card.innerHTML = `<h3>${event.title}</h3><p>${event.text}</p><div class="event-choices">${choicesHtml}</div>`;
+            eventsContainer.appendChild(card);
+        });
+    }
+
+    function renderLog(chatHistory) {
+        logContainer.innerHTML = '<h3>Лог событий</h3>';
+        const logContent = document.createElement('div');
+        logContent.className = 'log-content';
+        logContent.innerHTML = chatHistory.map(msg => `<p><b>${msg.sender}:</b> ${msg.text}</p>`).join('');
+        logContainer.appendChild(logContent);
+        logContent.scrollTop = logContent.scrollHeight;
+    }
+
     function handleActionClick(e) {
         const button = e.target.closest('.choice-button');
         if (!button) return;
@@ -98,35 +182,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const choiceId = button.dataset.choiceId;
         const eventCard = button.closest('.event-card');
 
-        // Используем if/else if для определения типа действия
         if (eventCard.classList.contains('minigame')) {
-            showMinigame(); // Мини-игра запускается на клиенте
+            showMinigame();
         } else if (eventCard.classList.contains('quiz')) {
             sendAction({ type: 'quiz_answer', event_id: eventId, choice_id: choiceId });
         } else {
-            // По умолчанию считаем, что это обычный выбор в событии (кризисе)
             sendAction({ type: 'event_choice', event_id: eventId, choice_id: choiceId });
         }
     }
 
-    /**
-     * Загружает начальное состояние игры.
-     */
-    async function initializeGame() {
-        try {
-            const response = await fetch(`${API_BASE_URL}/state`);
-            if (!response.ok) throw new Error(`HTTP error! ${response.status}`);
-            const initialState = await response.json();
-            render(initialState);
-        } catch (error) {
-            console.error("Не удалось загрузить состояние игры:", error);
-            eventsContainer.innerHTML = "<h2>Ошибка</h2><p>Не удалось подключиться к серверу.</p>";
-        }
-    }
-
-    // --- Логика Jira и Ганта ---
     function renderJiraBoard(state) {
         wipLimitDisplay.textContent = state.wip_limit;
+        wipLimitInput.value = state.wip_limit;
         const columns = document.querySelectorAll('.jira-column');
         columns.forEach(c => { while (c.children.length > 1) c.removeChild(c.lastChild); });
         for (const colId in state.tasks) {
@@ -164,7 +231,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Логика мини-игры ---
     let minigameInterval; let timerInterval;
     function showMinigame() {
         minigameModal.style.display = 'flex';
@@ -183,7 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
             task.onclick = () => task.remove();
             queue.prepend(task);
             if (queue.children.length > 6) {
-                endMinigame(false); // Провал
+                endMinigame(false);
             }
         }, 1200);
 
@@ -191,7 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
             timeLeft--;
             timerSpan.textContent = timeLeft;
             if (timeLeft <= 0) {
-                endMinigame(true); // Успех
+                endMinigame(true);
             }
         }, 1000);
 
@@ -206,6 +272,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Инициализация и обработчики событий ---
+    newGameBtn.onclick = newGame;
+    saveGameBtn.onclick = () => {
+        const slotId = prompt("Введите номер слота для сохранения (например, 1, 2, 3...):", "1");
+        if (slotId && !isNaN(slotId)) {
+            saveGame(parseInt(slotId, 10));
+        } else if (slotId !== null) {
+            alert("Пожалуйста, введите корректный номер слота.");
+        }
+    };
+    mainMenuBtn.onclick = showMainMenu;
+
     setWipLimitBtn.onclick = () => {
         const limit = parseInt(wipLimitInput.value, 10);
         if (limit > 0) sendAction({ type: 'set_wip_limit', limit: limit });
@@ -235,7 +312,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     eventsContainer.addEventListener('click', handleActionClick);
-    initializeGame();
+
+    // Start with the main menu
+    showMainMenu();
 
     // --- Экспонируем функции для тестирования ---
     window.endMinigame = endMinigame;
