@@ -55,7 +55,7 @@ class MockLLM:
     def __init__(self):
         self.responses = {
             "developer": ["Хм, задача выглядит сложнее.", "Понял, приступаю.", "Нужен четкий API-контракт."],
-            "developer_wip_error": ["Наш WIP-лимит превышен! Не могу взять задачу."],
+            "developer_wip_error": ["Наш WIP-лимит превышен! Сначала завершите текущие задачи."],
             "manager": ["Команда, ускоряемся.", "Отличный шаг.", "Бюджет не резиновый."],
             "stakeholder": ["Я хочу видеть прогресс.", "Нам нужна эта фича как можно скорее."],
             "ciso": ["Безопасность прежде всего!"],
@@ -69,8 +69,6 @@ class MockLLM:
 class OpenRouterLLM:
     """Взаимодействует с LLM через OpenRouter для генерации ответов."""
     def __init__(self, api_key):
-        # OpenRouterClient is not available in this environment
-        # This class is kept for structure but will fall back gracefully
         self.client = None
         self.model = "z-ai/glm-4.5-air:free"
 
@@ -82,7 +80,7 @@ class SimulationEngine:
     """Управляет игровыми сессиями с использованием LLM."""
     def __init__(self):
         self.active_game_state = None
-        self.llm = MockLLM() # Force MockLLM for now to ensure stability
+        self.llm = MockLLM()
 
         if not os.path.exists(SAVES_DIR):
             os.makedirs(SAVES_DIR)
@@ -130,42 +128,22 @@ class SimulationEngine:
         state = self.active_game_state
         state.level = 1
         state.unplanned_work = 80
+        state.wip_limit = 99 # No limit in Chaos phase
 
-        # Clear default tasks
         state.tasks["backlog"] = []
         state.tasks["in_progress"] = []
+        state.tasks["review"] = []
+        state.tasks["done"] = []
 
-        # LEVEL 1 SCENARIO: Total Chaos (Unplanned Work)
         chaos_tasks = [
-            {
-                "id": "task-pay-1", "title": "CRITICAL: Payroll Failure",
-                "type": WorkType.UNPLANNED, "points": 8, "duration": 4,
-                "required_resource": "brent", "assigned_resource": None,
-                "description": "Зарплаты не ушли. CFO угрожает увольнением."
-            },
-            {
-                "id": "task-web-1", "title": "CRITICAL: Site Down 500 Error",
-                "type": WorkType.UNPLANNED, "points": 5, "duration": 2,
-                "required_resource": "brent", "assigned_resource": None,
-                "description": "Главная страница не грузится. Маркетинг теряет лиды."
-            },
-            {
-                "id": "task-sec-1", "title": "Audit: PII Leak Vulnerability",
-                "type": WorkType.UNPLANNED, "points": 3, "duration": 2,
-                "required_resource": "brent", "assigned_resource": None,
-                "description": "CISO нашел дыру в безопасности данных клиентов."
-            }
+            {"id": "task-pay-1", "title": "CRITICAL: Payroll Failure", "type": WorkType.UNPLANNED, "points": 8, "duration": 4, "required_resource": "brent", "assigned_resource": None, "description": "Зарплаты не ушли. CFO угрожает увольнением."},
+            {"id": "task-web-1", "title": "CRITICAL: Site Down 500 Error", "type": WorkType.UNPLANNED, "points": 5, "duration": 2, "required_resource": "brent", "assigned_resource": None, "description": "Главная страница не грузится. Маркетинг теряет лиды."},
+            {"id": "task-sec-1", "title": "Audit: PII Leak Vulnerability", "type": WorkType.UNPLANNED, "points": 3, "duration": 2, "required_resource": "brent", "assigned_resource": None, "description": "CISO нашел дыру в безопасности данных клиентов."}
         ]
 
-        # Business Project (Phoenix) - Stuck in Backlog
-        phoenix_task = {
-            "id": "task-phx-1", "title": "Project Phoenix: MVP Scope",
-            "type": WorkType.BUSINESS, "points": 13, "duration": 10,
-            "required_resource": None, "assigned_resource": None,
-            "description": "Будущее компании. Но у нас нет времени на это."
-        }
+        phoenix_task = {"id": "task-phx-1", "title": "Project Phoenix: MVP Scope", "type": WorkType.BUSINESS, "points": 13, "duration": 10, "required_resource": None, "assigned_resource": None, "description": "Будущее компании. Но у нас нет времени на это."}
 
-        state.tasks["in_progress"] = chaos_tasks # Start with fire!
+        state.tasks["in_progress"] = chaos_tasks
         state.tasks["backlog"] = [phoenix_task]
 
         state.chat_history.append({"sender": "CFO", "text": "Где мои деньги?! Если зарплаты не уйдут к вечеру, у нас проблемы!"})
@@ -174,31 +152,40 @@ class SimulationEngine:
 
     def _initialize_level_2(self):
         state = self.active_game_state
-        state.level = 2; state.wip_limit = 3
-        state.chat_history.extend([{"sender": "System", "text": "--- НАЧАЛО УРОВНЯ 2: УВИДЕТЬ ПОТОК ---"}, {"sender": "Эрик", "text": self.llm.get_response("erik", state.chat_history)}])
-        # Level 2 init logic here if needed
+        state.level = 2
+        state.wip_limit = 3 # Strict Limit for Level 2
+        state.unplanned_work = 20 # Stabilized
 
-    def _initialize_level_3(self):
-        state = self.active_game_state
-        state.level = 3
-        state.chat_history.extend([{"sender": "System", "text": "--- НАЧАЛО УРОВНЯ 3: ПЕТЛЯ ОБРАТНОЙ СВЯЗИ ---"}])
+        # Keep existing 'Done' tasks but archive them conceptually.
+        # For simplicity, let's keep Phoenix in Backlog if it wasn't started, or move it to In Progress.
+        # We will add a mix of tasks to simulate flow.
+
+        new_tasks = [
+            {"id": "task-feat-2", "title": "Cart: One-Click Buy", "type": WorkType.BUSINESS, "points": 5, "duration": 3, "required_resource": None, "assigned_resource": None, "description": "Feature request from Marketing."},
+            {"id": "task-int-1", "title": "DB Migration Script", "type": WorkType.INTERNAL, "points": 3, "duration": 2, "required_resource": "brent", "assigned_resource": None, "description": "Technical debt cleanup."},
+            {"id": "task-chg-1", "title": "Update Tax Rate", "type": WorkType.CHANGES, "points": 1, "duration": 1, "required_resource": None, "assigned_resource": None, "description": "Small config change."}
+        ]
+
+        state.tasks["backlog"].extend(new_tasks)
+
+        state.chat_history.append({"sender": "System", "text": "--- УРОВЕНЬ 2: УВИДЕТЬ ПОТОК ---"})
+        state.mentor_log.append({"sender": "Эрик", "text": "Поздравляю, ты потушил пожары. Теперь ты должен научиться видеть поток. Мы вводим WIP-лимиты. Не бери в работу больше 3 задач одновременно!"})
 
     def _check_level_transition(self):
         state = self.active_game_state
 
-        # Win condition for Level 1: No Unplanned Work in Progress
-        unplanned_in_progress = len([t for t in state.tasks['in_progress'] if t['type'] == WorkType.UNPLANNED])
-
-        if state.level == 1 and unplanned_in_progress == 0 and state.unplanned_work > 40:
-            # Visual progress
-            state.unplanned_work = 40
-            state.mentor_log.append({"sender": "Эрик", "text": "Пожары потушены. Но почему они возникли? Пришло время понять потоки."})
-            # Transition logic to L2 can go here or be manual
+        # Level 1 -> Level 2 Transition
+        # Condition: All Unplanned Work (Red) is in 'done' column.
+        if state.level == 1:
+            unplanned_done = len([t for t in state.tasks['done'] if t['type'] == WorkType.UNPLANNED])
+            # We spawned 3 unplanned tasks. If 3 are done, we proceed.
+            # (Assuming player didn't delete them, which isn't possible yet)
+            if unplanned_done >= 3:
+                 self._initialize_level_2()
 
     # --- Action Handlers ---
 
     def _handle_assign_resource(self, action):
-        """Присваивает ресурс задаче. Если ресурс был занят, освобождает его от старой задачи."""
         state = self.active_game_state
         resource_id = action.get('resource_id')
         task_id = action.get('task_id')
@@ -206,18 +193,14 @@ class SimulationEngine:
         resource = next((r for r in state.resources if r['id'] == resource_id), None)
         if not resource: return
 
-        # 1. Unassign from previous task if any
         if resource['busy_task_id']:
-            # Find the old task and clear assignment
             for col in state.tasks.values():
                 for t in col:
                     if t['id'] == resource['busy_task_id']:
                         t['assigned_resource'] = None
 
-        # 2. Assign to new task
         resource['busy_task_id'] = task_id
 
-        # Find the new task and update assignment
         task_found = False
         for col in state.tasks.values():
             for t in col:
@@ -229,12 +212,13 @@ class SimulationEngine:
 
         if task_found:
             state.chat_history.append({"sender": "System", "text": f"{resource['name']} теперь работает над задачей {task_id}."})
-            # Erik comments on bottleneck
             if resource_id == 'brent':
-                state.mentor_log.append({"sender": "Эрик", "text": "Ты используешь Брента как затычку. Он — твое ограничение. Пока он тут, другие задачи стоят."})
+                if state.level == 1:
+                     state.mentor_log.append({"sender": "Эрик", "text": "Ты используешь Брента как затычку. Он — твое ограничение."})
+                else:
+                     state.mentor_log.append({"sender": "Эрик", "text": "Брент снова нужен? Помни, он не масштабируется."})
 
     def _handle_event_choice(self, action):
-        # Placeholder for legacy event handling if needed
         pass
 
     def _handle_quiz_answer(self, action):
@@ -243,10 +227,13 @@ class SimulationEngine:
     def _handle_task_move(self, action):
         state = self.active_game_state
 
-        # Check WIP limit logic
+        # WIP Limit Enforcement
         if action.get('new_column_id') == 'in_progress':
-             # Basic WIP check
-             pass
+             current_wip = len(state.tasks['in_progress'])
+             if current_wip >= state.wip_limit:
+                 state.chat_history.append({"sender": "System", "text": "WIP Limit Exceeded! Finish existing tasks first."})
+                 state.mentor_log.append({"sender": "Эрик", "text": "Стоп! Ты нарушаешь WIP-лимит. Закончи начатое, прежде чем начинать новое."})
+                 return # Reject move
 
         task_to_move = None
         source_list = state.tasks.get(action.get('old_column_id'))
@@ -261,7 +248,6 @@ class SimulationEngine:
             destination_list = state.tasks.get(action.get('new_column_id'))
             destination_list.append(task_to_move)
 
-            # If moving to Done, free up resource
             if action.get('new_column_id') == 'done':
                 if task_to_move.get('assigned_resource'):
                     res_id = task_to_move['assigned_resource']

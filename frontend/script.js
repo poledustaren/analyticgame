@@ -4,9 +4,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- DOM Elements ---
     const appLayout = document.getElementById('app-layout');
-    const mainMenuContainer = document.createElement('div'); // Will create dynamic or reuse existing concept
     // Sidebar
     const levelDisplay = document.getElementById('level-display');
+    const levelTitle = document.querySelector('.level-title'); // Need to update this text
     const resourcePool = document.getElementById('resource-pool');
     const newGameBtn = document.getElementById('new-game-btn');
     const saveGameBtn = document.getElementById('save-game-btn');
@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Board
     const wipCurrent = document.getElementById('wip-current');
     const wipLimit = document.getElementById('wip-limit');
+    const wipBadge = document.querySelector('.wip-badge'); // For coloring
     // Panels
     const mentorLog = document.getElementById('mentor-log');
     const chatLog = document.getElementById('chat-log');
@@ -46,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Drag & Drop Global Handlers
         setupDragAndDrop();
 
-        // Auto-start new game for debugging/demo purposes
+        // Auto-start new game
         startNewGame();
     }
 
@@ -80,10 +81,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Rendering Logic ---
     function render(state) {
+        // Check for Level Change (Transition Animation placeholder)
+        if (currentState && currentState.level < state.level) {
+            alert(`CONGRATULATIONS! Level ${currentState.level} Complete.\nStarting Level ${state.level}: The First Way (Flow)`);
+        }
+
         currentState = state;
 
-        // 1. Metrics
+        // 1. Metrics & Level
         levelDisplay.textContent = state.level;
+        if (state.level === 1) levelTitle.textContent = "The Stabilizer";
+        else if (state.level === 2) levelTitle.textContent = "The First Way (Flow)";
+
         metricBudget.textContent = `$${state.budget.toLocaleString()}`;
         metricStability.textContent = `${state.stability}%`;
         metricWeek.textContent = state.week;
@@ -109,7 +118,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderResources(resources) {
         resourcePool.innerHTML = '';
         resources.forEach(res => {
-            // If resource is busy, they are rendered inside the task card, not the pool
             if (!res.busy_task_id) {
                 const avatar = createAvatarElement(res);
                 resourcePool.appendChild(avatar);
@@ -121,7 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const div = document.createElement('div');
         div.className = 'resource-avatar';
         div.draggable = true;
-        div.textContent = res.name[0]; // First letter
+        div.textContent = res.name[0];
         div.dataset.resourceId = res.id;
         div.title = `${res.name} (${res.role})`;
         return div;
@@ -130,6 +138,15 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderBoard(tasks, limit) {
         wipLimit.textContent = limit;
         wipCurrent.textContent = tasks.in_progress.length;
+
+        // Highlight WIP violation or fullness
+        if (tasks.in_progress.length >= limit) {
+            wipBadge.style.backgroundColor = '#ef4444'; // Red warning
+            wipBadge.style.color = 'white';
+        } else {
+            wipBadge.style.backgroundColor = '#334155'; // Default
+            wipBadge.style.color = '#94a3b8';
+        }
 
         // Clear columns
         ['backlog', 'in_progress', 'review', 'done'].forEach(colId => {
@@ -149,17 +166,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 card.className = `task-card type-${task.type}`;
                 card.draggable = true;
                 card.dataset.taskId = task.id;
-                card.dataset.colId = colId; // Track current column
+                card.dataset.colId = colId;
 
-                // Check if Brent is needed and assigned
                 const isResourceNeeded = !!task.required_resource;
                 const assignedResId = task.assigned_resource;
 
                 let resourceSlotHtml = '';
                 if (isResourceNeeded) {
                     if (assignedResId) {
-                        // Render avatar inside card
-                         // Find resource name from state
                          const resName = currentState.resources.find(r => r.id === assignedResId)?.name || '?';
                         resourceSlotHtml = `<div class="resource-slot-mini filled" title="Assigned: ${resName}">
                             <div class="resource-avatar" style="width:24px; height:24px; font-size:10px;">${resName[0]}</div>
@@ -179,7 +193,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 `;
 
-                // If task needs resource and none assigned, it's a drop target for resources
                 if (isResourceNeeded && !assignedResId) {
                     card.classList.add('resource-drop-target');
                 }
@@ -190,8 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderLogs(mentorMessages, teamMessages) {
-        // Render Mentor Log (reverse order usually better for chat, but log style is append)
-        // We will just clear and rebuild for simplicity in this prototype
+        // Simple rebuild
         mentorLog.innerHTML = mentorMessages.map(msg => `
             <div class="log-message sender-eric">
                 <strong>${msg.sender}</strong>: ${msg.text}
@@ -209,7 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Drag & Drop Logic ---
     let draggedElement = null;
-    let dragType = null; // 'task' or 'resource'
+    let dragType = null;
 
     function setupDragAndDrop() {
         document.addEventListener('dragstart', e => {
@@ -229,7 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
             draggedElement = null;
             dragType = null;
             document.querySelectorAll('.kanban-column').forEach(c => c.classList.remove('drag-over'));
-            document.querySelectorAll('.task-card').forEach(c => c.style.borderStyle = ''); // Reset borders
+            document.querySelectorAll('.task-card').forEach(c => c.style.borderStyle = '');
         });
 
         // Columns are drop targets for TASKS
@@ -249,6 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const taskId = draggedElement.dataset.taskId;
                     const oldColId = draggedElement.dataset.colId;
 
+                    // Optimization: Don't send request if dropping in same column
                     if (newColId !== oldColId) {
                         sendAction({
                             type: 'task_move',
@@ -262,7 +275,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Task Cards are drop targets for RESOURCES
-        // Need global listener since cards are dynamic
         document.addEventListener('dragover', e => {
             const card = e.target.closest('.task-card');
             if (dragType === 'resource' && card && card.classList.contains('resource-drop-target')) {
@@ -273,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.addEventListener('dragleave', e => {
             const card = e.target.closest('.task-card');
-            if (card) card.style.border = ''; // clear override
+            if (card) card.style.border = '';
         });
 
         document.addEventListener('drop', e => {
