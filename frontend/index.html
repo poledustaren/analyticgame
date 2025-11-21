@@ -3,66 +3,139 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Проект Феникс: Симулятор</title>
+    <title>The Phoenix Project: Simulator</title>
     <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <!-- Экран главного меню (виден по умолчанию) -->
-    <div id="main-menu-container">
-        <h1>Проект Феникс: Симулятор</h1>
-        <div class="menu-box">
-            <button id="new-game-btn">Новая игра</button>
-        </div>
-        <div class="menu-box">
-            <h2>Загрузить игру</h2>
-            <div id="saves-list">
-                <!-- Сюда будут загружаться слоты сохранений -->
-                <p>Сохранений не найдено.</p>
-            </div>
-        </div>
-    </div>
 
-    <!-- Основной контейнер игры (скрыт по умолчанию) -->
-    <div id="app-container" style="display: none;">
-        <div id="game-controls">
-            <button id="save-game-btn">Сохранить игру (Слот 1)</button>
-            <button id="main-menu-btn">Главное меню</button>
-        </div>
-        <div id="main-container">
-            <div id="game-container">
-                <div id="metrics-display"></div>
-                <div id="events-container"></div>
+    <div id="app-layout">
+
+        <!-- LEFT SIDEBAR: Resources & Game Info -->
+        <aside id="sidebar">
+            <div class="brand">
+                <h1>PHOENIX<br><span>SIMULATOR</span></h1>
             </div>
-            <div id="jira-board-container">
-                <h2>Jira Доска</h2>
-                <div id="jira-board">
-                    <div class="jira-column" id="backlog" data-column-id="backlog"><h3>Backlog</h3></div>
-                    <div class="jira-column" id="in_progress" data-column-id="in_progress">
-                        <h3>In Progress <span class="wip-limit-control">(WIP: <span id="wip-limit-display"></span>) <input type="number" id="wip-limit-input" min="1" title="Установить WIP лимит"> <button id="set-wip-limit-btn">Set</button></span></h3>
+
+            <div class="sidebar-section">
+                <h3>LEVEL <span id="level-display">1</span></h3>
+                <p class="level-title">The Stabilizer</p>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>RESOURCES</h3>
+                <div id="resources-container">
+                    <!-- Brent and others will appear here -->
+                    <div class="resource-slot" id="resource-pool">
+                        <!-- Draggable Avatars go here -->
                     </div>
-                    <div class="jira-column" id="review" data-column-id="review"><h3>Review</h3></div>
-                    <div class="jira-column" id="done" data-column-id="done"><h3>Done</h3></div>
+                </div>
+                <div class="instruction-text">
+                    Drag resources to tasks to unblock them.
                 </div>
             </div>
-        </div>
-        <div id="gantt-chart-container">
-            <h2>График Ганта</h2>
-            <div id="gantt-chart"></div>
-        </div>
+
+            <div class="sidebar-section spacer"></div>
+
+            <div class="sidebar-menu">
+                <button id="new-game-btn" class="menu-btn">Restart Level</button>
+                <button id="save-game-btn" class="menu-btn">Save Progress</button>
+            </div>
+        </aside>
+
+        <!-- CENTER: Dashboard & Board -->
+        <main id="main-content">
+
+            <!-- Top Header Metrics -->
+            <header id="metrics-header">
+                <div class="metric-card">
+                    <span class="label">BUDGET</span>
+                    <span class="value" id="metric-budget">$0</span>
+                </div>
+                <div class="metric-card">
+                    <span class="label">STABILITY</span>
+                    <span class="value" id="metric-stability">0%</span>
+                </div>
+                <div class="metric-card">
+                    <span class="label">UNPLANNED WORK</span>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" id="metric-unplanned-bar" style="width: 0%;"></div>
+                    </div>
+                    <span class="value-sub" id="metric-unplanned-text">0%</span>
+                </div>
+                <div class="metric-card">
+                    <span class="label">WEEK</span>
+                    <span class="value" id="metric-week">1</span>
+                </div>
+            </header>
+
+            <!-- Kanban Board -->
+            <div id="board-container">
+                <div class="kanban-column" id="backlog" data-column-id="backlog">
+                    <div class="column-header">
+                        <h2>BACKLOG</h2>
+                        <span class="count">0</span>
+                    </div>
+                    <div class="task-list"></div>
+                </div>
+
+                <div class="kanban-column" id="in_progress" data-column-id="in_progress">
+                    <div class="column-header">
+                        <h2>IN PROGRESS</h2>
+                        <span class="wip-badge">WIP: <span id="wip-current">0</span>/<span id="wip-limit">0</span></span>
+                    </div>
+                    <div class="task-list"></div>
+                </div>
+
+                <div class="kanban-column" id="review" data-column-id="review">
+                    <div class="column-header">
+                        <h2>REVIEW</h2>
+                        <span class="count">0</span>
+                    </div>
+                    <div class="task-list"></div>
+                </div>
+
+                <div class="kanban-column" id="done" data-column-id="done">
+                    <div class="column-header">
+                        <h2>DONE</h2>
+                        <span class="count">0</span>
+                    </div>
+                    <div class="task-list"></div>
+                </div>
+            </div>
+        </main>
+
+        <!-- RIGHT PANEL: Mentor & Comms -->
+        <aside id="right-panel">
+            <div class="panel-tabs">
+                <button class="tab-btn active" data-tab="mentor">MENTOR</button>
+                <button class="tab-btn" data-tab="chat">TEAM CHAT</button>
+            </div>
+
+            <div id="mentor-tab" class="tab-content active">
+                <div class="erik-avatar">
+                    <div class="avatar-circle">E</div>
+                    <div class="erik-status">Erik is watching...</div>
+                </div>
+                <div id="mentor-log" class="log-scroll">
+                    <!-- Messages from Erik -->
+                </div>
+            </div>
+
+            <div id="chat-tab" class="tab-content">
+                <div id="chat-log" class="log-scroll">
+                    <!-- Team Chat -->
+                </div>
+            </div>
+        </aside>
+
     </div>
 
-    <!-- Модальное окно для мини-игры (без изменений) -->
+    <!-- Minigame Modal Overlay (Preserved) -->
     <div id="minigame-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content">
-            <h2>Мини-игра: Балансировщик потока</h2>
-            <p>Кликните на задачу, чтобы "обработать" ее. Не дайте очереди переполниться!</p>
-            <div id="minigame-area"><div id="minigame-queue"></div></div>
-            <div id="minigame-timer">Время: <span>30</span>с</div>
-            <button id="minigame-close-btn" style="display: none;">Завершить</button>
-        </div>
+        <!-- Content generated dynamically or same as before -->
     </div>
 
-    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

@@ -1,110 +1,62 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // --- API & DOM ---
+    // --- API & Constants ---
     const API_BASE_URL = 'http://127.0.0.1:5001/api';
 
-    // Menu Screen
-    const mainMenuContainer = document.getElementById('main-menu-container');
+    // --- DOM Elements ---
+    const appLayout = document.getElementById('app-layout');
+    const mainMenuContainer = document.createElement('div'); // Will create dynamic or reuse existing concept
+    // Sidebar
+    const levelDisplay = document.getElementById('level-display');
+    const resourcePool = document.getElementById('resource-pool');
     const newGameBtn = document.getElementById('new-game-btn');
-    const savesList = document.getElementById('saves-list');
-
-    // App Screen
-    const appContainer = document.getElementById('app-container');
     const saveGameBtn = document.getElementById('save-game-btn');
-    const mainMenuBtn = document.getElementById('main-menu-btn');
-    const metricsDisplay = document.getElementById('metrics-display');
-    const eventsContainer = document.getElementById('events-container');
-    const wipLimitDisplay = document.getElementById('wip-limit-display');
-    const wipLimitInput = document.getElementById('wip-limit-input');
-    const setWipLimitBtn = document.getElementById('set-wip-limit-btn');
-    const minigameModal = document.getElementById('minigame-modal');
-    const logContainer = document.createElement('div');
-    logContainer.id = 'log-container';
-    document.getElementById('game-container').appendChild(logContainer);
+    // Metrics
+    const metricBudget = document.getElementById('metric-budget');
+    const metricStability = document.getElementById('metric-stability');
+    const metricUnplannedBar = document.getElementById('metric-unplanned-bar');
+    const metricUnplannedText = document.getElementById('metric-unplanned-text');
+    const metricWeek = document.getElementById('metric-week');
+    // Board
+    const wipCurrent = document.getElementById('wip-current');
+    const wipLimit = document.getElementById('wip-limit');
+    // Panels
+    const mentorLog = document.getElementById('mentor-log');
+    const chatLog = document.getElementById('chat-log');
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
 
+    // --- State Management ---
+    let currentState = null;
 
-    // --- UI Переключатели ---
-    function showMainMenu() {
-        appContainer.style.display = 'none';
-        mainMenuContainer.style.display = 'block';
-        loadSavesList();
-    }
+    // --- Initialization ---
+    function init() {
+        // Attach Event Listeners
+        newGameBtn.onclick = startNewGame;
+        saveGameBtn.onclick = handleSaveGame;
 
-    function showGame() {
-        mainMenuContainer.style.display = 'none';
-        appContainer.style.display = 'block';
-    }
-
-    // --- API Взаимодействия ---
-    async function loadSavesList() {
-        try {
-            const response = await fetch(`${API_BASE_URL}/saves`);
-            const saves = await response.json();
-            savesList.innerHTML = '';
-            if (saves.length === 0) {
-                savesList.innerHTML = '<p>Сохранений не найдено.</p>';
-                return;
-            }
-            saves.forEach(saveFile => {
-                const slotId = saveFile.replace('save_', '').replace('.json', '');
-                const button = document.createElement('button');
-                button.textContent = `Загрузить Слот ${slotId}`;
-                button.dataset.slotId = slotId;
-                button.onclick = () => loadGame(slotId);
-                savesList.appendChild(button);
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                tabBtns.forEach(b => b.classList.remove('active'));
+                tabContents.forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(`${btn.dataset.tab}-tab`).classList.add('active');
             });
-        } catch (error) {
-            console.error("Ошибка загрузки списка сохранений:", error);
-            savesList.innerHTML = '<p>Ошибка загрузки списка.</p>';
-        }
+        });
+
+        // Drag & Drop Global Handlers
+        setupDragAndDrop();
+
+        // Auto-start new game for debugging/demo purposes
+        startNewGame();
     }
 
-    async function newGame() {
+    async function startNewGame() {
         try {
             const response = await fetch(`${API_BASE_URL}/new_game`, { method: 'POST' });
             const state = await response.json();
-            if (state.error) throw new Error(state.error);
             render(state);
-            showGame();
         } catch (error) {
-            console.error("Ошибка при начале новой игры:", error);
-            alert("Не удалось начать новую игру.");
-        }
-    }
-
-    async function saveGame(slotId) {
-        try {
-            const response = await fetch(`${API_BASE_URL}/save_game`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ slot_id: slotId }),
-            });
-            const result = await response.json();
-            if (result.success) {
-                alert(result.message);
-                loadSavesList();
-            } else {
-                throw new Error(result.error);
-            }
-        } catch (error) {
-            console.error("Ошибка сохранения игры:", error);
-            alert("Не удалось сохранить игру.");
-        }
-    }
-
-    async function loadGame(slotId) {
-        try {
-            const response = await fetch(`${API_BASE_URL}/load_game`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ slot_id: slotId }),
-            });
-            const state = await response.json();
-            if (state.error) throw new Error(state.error);
-            render(state);
-            showGame();
-        } catch (error) {
-            console.error("Ошибка загрузки игры:", error);
-            alert("Не удалось загрузить игру.");
+            console.error("Failed to start game:", error);
         }
     }
 
@@ -115,207 +67,230 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(actionData),
             });
-            if (!response.ok) throw new Error(`HTTP error! ${response.status}`);
             const newState = await response.json();
             render(newState);
         } catch (error) {
-            console.error("Ошибка при отправке действия:", error);
-            eventsContainer.innerHTML = "<h2>Ошибка</h2><p>Ошибка связи с сервером.</p>";
+            console.error("Action failed:", error);
         }
     }
 
-    // --- Основная логика рендеринга ---
+    async function handleSaveGame() {
+        alert("Save functionality placeholder.");
+    }
+
+    // --- Rendering Logic ---
     function render(state) {
-        if (!state || state.error) {
-            alert(state.error || "Произошла ошибка состояния игры.");
-            showMainMenu();
-            return;
-        }
-        renderMetrics(state);
-        renderEvents(state.active_events);
-        renderJiraBoard(state);
-        renderGanttChart(state.tasks, state.week);
-        renderLog(state.chat_history);
+        currentState = state;
+
+        // 1. Metrics
+        levelDisplay.textContent = state.level;
+        metricBudget.textContent = `$${state.budget.toLocaleString()}`;
+        metricStability.textContent = `${state.stability}%`;
+        metricWeek.textContent = state.week;
+
+        // Unplanned Work Bar
+        const unplannedPct = state.unplanned_work;
+        metricUnplannedBar.style.width = `${unplannedPct}%`;
+        metricUnplannedText.textContent = `${unplannedPct}%`;
+        if (unplannedPct > 50) metricUnplannedBar.style.backgroundColor = '#ef4444'; // Red
+        else if (unplannedPct > 20) metricUnplannedBar.style.backgroundColor = '#f59e0b'; // Orange
+        else metricUnplannedBar.style.backgroundColor = '#22c55e'; // Green
+
+        // 2. Resources (Brent)
+        renderResources(state.resources);
+
+        // 3. Board
+        renderBoard(state.tasks, state.wip_limit);
+
+        // 4. Logs
+        renderLogs(state.mentor_log, state.chat_history);
     }
 
-    function renderMetrics(state) {
-        const getColor = (val, good, bad) => (val >= good ? 'metric-good' : (val <= bad ? 'metric-bad' : 'metric-ok'));
-        metricsDisplay.innerHTML = `
-            <div class="metric-item"><span class="label">Уровень</span><span class="value">${state.level}</span></div>
-            <div class="metric-item"><span class="label">Неделя</span><span class="value">${state.week}</span></div>
-            <div class="metric-item"><span class="label">Бюджет</span><span class="value ${state.budget < 0 ? 'metric-bad' : ''}">$${state.budget.toLocaleString()}</span></div>
-            <div class="metric-item"><span class="label">Мораль</span><span class="value ${getColor(state.morale, 75, 45)}">${state.morale}%</span></div>
-            <div class="metric-item"><span class="label">Стабильность</span><span class="value ${getColor(state.stability, 80, 40)}">${state.stability}%</span></div>
-            <div class="metric-item"><span class="label">Незаплан. работа</span><span class="value ${getColor(100 - state.unplanned_work, 60, 20)}">${state.unplanned_work}%</span></div>
-            <div class="metric-item"><span class="label">Прогресс 'Феникса'</span><span class="value">${state.phoenix_progress}%</span></div>`;
-    }
-
-    function renderEvents(events) {
-        eventsContainer.innerHTML = '<h2>Активные события</h2>';
-        if (!events || events.length === 0) {
-            eventsContainer.innerHTML += '<p>Все спокойно... пока.</p>';
-            return;
-        }
-        events.forEach(event => {
-            const card = document.createElement('div');
-            card.className = 'event-card ' + event.type;
-            let choicesHtml = event.choices.map(c => `<button data-event-id="${event.id}" data-choice-id="${c.id}" class="choice-button">${c.text}</button>`).join('');
-            card.innerHTML = `<h3>${event.title}</h3><p>${event.text}</p><div class="event-choices">${choicesHtml}</div>`;
-            eventsContainer.appendChild(card);
+    function renderResources(resources) {
+        resourcePool.innerHTML = '';
+        resources.forEach(res => {
+            // If resource is busy, they are rendered inside the task card, not the pool
+            if (!res.busy_task_id) {
+                const avatar = createAvatarElement(res);
+                resourcePool.appendChild(avatar);
+            }
         });
     }
 
-    function renderLog(chatHistory) {
-        logContainer.innerHTML = '<h3>Лог событий</h3>';
-        const logContent = document.createElement('div');
-        logContent.className = 'log-content';
-        logContent.innerHTML = chatHistory.map(msg => `<p><b>${msg.sender}:</b> ${msg.text}</p>`).join('');
-        logContainer.appendChild(logContent);
-        logContent.scrollTop = logContent.scrollHeight;
+    function createAvatarElement(res) {
+        const div = document.createElement('div');
+        div.className = 'resource-avatar';
+        div.draggable = true;
+        div.textContent = res.name[0]; // First letter
+        div.dataset.resourceId = res.id;
+        div.title = `${res.name} (${res.role})`;
+        return div;
     }
 
-    function handleActionClick(e) {
-        const button = e.target.closest('.choice-button');
-        if (!button) return;
+    function renderBoard(tasks, limit) {
+        wipLimit.textContent = limit;
+        wipCurrent.textContent = tasks.in_progress.length;
 
-        const eventId = button.dataset.eventId;
-        const choiceId = button.dataset.choiceId;
-        const eventCard = button.closest('.event-card');
+        // Clear columns
+        ['backlog', 'in_progress', 'review', 'done'].forEach(colId => {
+            const colList = document.querySelector(`#${colId} .task-list`);
+            const countSpan = document.querySelector(`#${colId} .count`);
+            if (colList) colList.innerHTML = '';
+            if (countSpan) countSpan.textContent = tasks[colId] ? tasks[colId].length : 0;
+        });
 
-        if (eventCard.classList.contains('minigame')) {
-            showMinigame();
-        } else if (eventCard.classList.contains('quiz')) {
-            sendAction({ type: 'quiz_answer', event_id: eventId, choice_id: choiceId });
-        } else {
-            sendAction({ type: 'event_choice', event_id: eventId, choice_id: choiceId });
+        // Render Tasks
+        for (const [colId, taskList] of Object.entries(tasks)) {
+            const colList = document.querySelector(`#${colId} .task-list`);
+            if (!colList) continue;
+
+            taskList.forEach(task => {
+                const card = document.createElement('div');
+                card.className = `task-card type-${task.type}`;
+                card.draggable = true;
+                card.dataset.taskId = task.id;
+                card.dataset.colId = colId; // Track current column
+
+                // Check if Brent is needed and assigned
+                const isResourceNeeded = !!task.required_resource;
+                const assignedResId = task.assigned_resource;
+
+                let resourceSlotHtml = '';
+                if (isResourceNeeded) {
+                    if (assignedResId) {
+                        // Render avatar inside card
+                         // Find resource name from state
+                         const resName = currentState.resources.find(r => r.id === assignedResId)?.name || '?';
+                        resourceSlotHtml = `<div class="resource-slot-mini filled" title="Assigned: ${resName}">
+                            <div class="resource-avatar" style="width:24px; height:24px; font-size:10px;">${resName[0]}</div>
+                        </div>`;
+                    } else {
+                        resourceSlotHtml = `<div class="resource-slot-mini" title="Drag Brent Here"></div>
+                        <div class="needed-badge">NEEDS BRENT</div>`;
+                    }
+                }
+
+                card.innerHTML = `
+                    <h4>${task.title}</h4>
+                    <p style="font-size:11px; color:#ccc;">${task.description || ''}</p>
+                    <div class="task-meta">
+                        <span>${task.points} pts</span>
+                        ${resourceSlotHtml}
+                    </div>
+                `;
+
+                // If task needs resource and none assigned, it's a drop target for resources
+                if (isResourceNeeded && !assignedResId) {
+                    card.classList.add('resource-drop-target');
+                }
+
+                colList.appendChild(card);
+            });
         }
     }
 
-    function renderJiraBoard(state) {
-        wipLimitDisplay.textContent = state.wip_limit;
-        wipLimitInput.value = state.wip_limit;
-        const columns = document.querySelectorAll('.jira-column');
-        columns.forEach(c => { while (c.children.length > 1) c.removeChild(c.lastChild); });
-        for (const colId in state.tasks) {
-            const colEl = document.getElementById(colId);
-            if (colEl) {
-                state.tasks[colId].forEach(task => {
-                    const card = document.createElement('div');
-                    card.className = 'task-card'; card.draggable = true; card.dataset.taskId = task.id;
-                    card.innerHTML = `<div class="title">${task.title}</div><div class="points">Points: ${task.points}</div>`;
-                    colEl.appendChild(card);
+    function renderLogs(mentorMessages, teamMessages) {
+        // Render Mentor Log (reverse order usually better for chat, but log style is append)
+        // We will just clear and rebuild for simplicity in this prototype
+        mentorLog.innerHTML = mentorMessages.map(msg => `
+            <div class="log-message sender-eric">
+                <strong>${msg.sender}</strong>: ${msg.text}
+            </div>
+        `).join('');
+        mentorLog.scrollTop = mentorLog.scrollHeight;
+
+        chatLog.innerHTML = teamMessages.map(msg => `
+            <div class="log-message">
+                <strong>${msg.sender}</strong>: ${msg.text}
+            </div>
+        `).join('');
+        chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    // --- Drag & Drop Logic ---
+    let draggedElement = null;
+    let dragType = null; // 'task' or 'resource'
+
+    function setupDragAndDrop() {
+        document.addEventListener('dragstart', e => {
+            if (e.target.classList.contains('task-card')) {
+                draggedElement = e.target;
+                dragType = 'task';
+                e.target.style.opacity = '0.5';
+            } else if (e.target.classList.contains('resource-avatar')) {
+                draggedElement = e.target;
+                dragType = 'resource';
+                e.target.style.opacity = '0.5';
+            }
+        });
+
+        document.addEventListener('dragend', e => {
+            if (e.target) e.target.style.opacity = '1';
+            draggedElement = null;
+            dragType = null;
+            document.querySelectorAll('.kanban-column').forEach(c => c.classList.remove('drag-over'));
+            document.querySelectorAll('.task-card').forEach(c => c.style.borderStyle = ''); // Reset borders
+        });
+
+        // Columns are drop targets for TASKS
+        document.querySelectorAll('.kanban-column').forEach(col => {
+            col.addEventListener('dragover', e => {
+                if (dragType === 'task') {
+                    e.preventDefault();
+                    col.classList.add('drag-over');
+                }
+            });
+            col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
+            col.addEventListener('drop', e => {
+                if (dragType === 'task') {
+                    e.preventDefault();
+                    col.classList.remove('drag-over');
+                    const newColId = col.dataset.columnId;
+                    const taskId = draggedElement.dataset.taskId;
+                    const oldColId = draggedElement.dataset.colId;
+
+                    if (newColId !== oldColId) {
+                        sendAction({
+                            type: 'task_move',
+                            task_id: taskId,
+                            new_column_id: newColId,
+                            old_column_id: oldColId
+                        });
+                    }
+                }
+            });
+        });
+
+        // Task Cards are drop targets for RESOURCES
+        // Need global listener since cards are dynamic
+        document.addEventListener('dragover', e => {
+            const card = e.target.closest('.task-card');
+            if (dragType === 'resource' && card && card.classList.contains('resource-drop-target')) {
+                e.preventDefault();
+                card.style.border = '2px dashed #eab308';
+            }
+        });
+
+        document.addEventListener('dragleave', e => {
+            const card = e.target.closest('.task-card');
+            if (card) card.style.border = ''; // clear override
+        });
+
+        document.addEventListener('drop', e => {
+            const card = e.target.closest('.task-card');
+            if (dragType === 'resource' && card && card.classList.contains('resource-drop-target')) {
+                e.preventDefault();
+                const resourceId = draggedElement.dataset.resourceId;
+                const taskId = card.dataset.taskId;
+
+                sendAction({
+                    type: 'assign_resource',
+                    resource_id: resourceId,
+                    task_id: taskId
                 });
             }
-        }
-    }
-
-    function renderGanttChart(tasks, currentWeek) {
-        if (typeof google === 'undefined' || !google.charts) return;
-        google.charts.load('current', {'packages':['gantt']});
-        google.charts.setOnLoadCallback(() => {
-            const data = new google.visualization.DataTable();
-            ['string', 'string', 'date', 'date', 'number', 'number', 'string'].forEach((type, i) => data.addColumn(type, ['ID', 'Name', 'Start', 'End', 'Duration', '% Complete', 'Deps'][i]));
-            const rows = Object.values(tasks).flat().filter(t => t.start_week !== null).map(t => {
-                const start = new Date(); start.setDate(start.getDate() + (t.start_week - 1) * 7);
-                const end = new Date(start); end.setDate(end.getDate() + t.duration * 7);
-                let p = 0;
-                if (tasks.done.some(d => d.id === t.id)) p = 100;
-                else if (tasks.review.some(r => r.id === t.id)) p = 75;
-                else if (tasks.in_progress.some(i => i.id === t.id)) p = 25;
-                return [t.id, t.title, start, end, null, p, null];
-            });
-            const chartEl = document.getElementById('gantt-chart');
-            if (rows.length === 0) { chartEl.innerHTML = '<p style="text-align:center; color:#999;">Начните работу над задачами.</p>'; return; }
-            data.addRows(rows);
-            new google.visualization.Gantt(chartEl).draw(data, { height: 350, gantt: { trackHeight: 30 } });
         });
     }
 
-    let minigameInterval; let timerInterval;
-    function showMinigame() {
-        minigameModal.style.display = 'flex';
-        const queue = document.getElementById('minigame-queue');
-        const timerSpan = document.querySelector('#minigame-timer span');
-        const closeBtn = document.getElementById('minigame-close-btn');
-        queue.innerHTML = '';
-        timerSpan.textContent = '30';
-        closeBtn.style.display = 'none';
-
-        let timeLeft = 30;
-        minigameInterval = setInterval(() => {
-            const task = document.createElement('div');
-            task.className = 'minigame-task';
-            task.textContent = 'Task';
-            task.onclick = () => task.remove();
-            queue.prepend(task);
-            if (queue.children.length > 6) {
-                endMinigame(false);
-            }
-        }, 1200);
-
-        timerInterval = setInterval(() => {
-            timeLeft--;
-            timerSpan.textContent = timeLeft;
-            if (timeLeft <= 0) {
-                endMinigame(true);
-            }
-        }, 1000);
-
-        closeBtn.onclick = () => minigameModal.style.display = 'none';
-    }
-
-    function endMinigame(success) {
-        clearInterval(minigameInterval);
-        clearInterval(timerInterval);
-        document.getElementById('minigame-close-btn').style.display = 'block';
-        sendAction({ type: 'minigame_result', result: success ? 'success' : 'failure' });
-    }
-
-    // --- Инициализация и обработчики событий ---
-    newGameBtn.onclick = newGame;
-    saveGameBtn.onclick = () => {
-        const slotId = prompt("Введите номер слота для сохранения (например, 1, 2, 3...):", "1");
-        if (slotId && !isNaN(slotId)) {
-            saveGame(parseInt(slotId, 10));
-        } else if (slotId !== null) {
-            alert("Пожалуйста, введите корректный номер слота.");
-        }
-    };
-    mainMenuBtn.onclick = showMainMenu;
-
-    setWipLimitBtn.onclick = () => {
-        const limit = parseInt(wipLimitInput.value, 10);
-        if (limit > 0) sendAction({ type: 'set_wip_limit', limit: limit });
-    };
-
-    let draggedItem = null, oldColumnId = null;
-    document.addEventListener('dragstart', e => {
-        if (e.target.classList.contains('task-card')) {
-            draggedItem = e.target; oldColumnId = e.target.closest('.jira-column').dataset.columnId;
-            setTimeout(() => e.target.style.display = 'none', 0);
-        }
-    });
-    document.addEventListener('dragend', () => {
-        if (draggedItem) {
-            setTimeout(() => { draggedItem.style.display = 'block'; draggedItem = null; oldColumnId = null; }, 0);
-        }
-    });
-    document.querySelectorAll('.jira-column').forEach(c => {
-        c.addEventListener('dragover', e => e.preventDefault());
-        c.addEventListener('drop', e => {
-            e.preventDefault();
-            if (draggedItem && e.currentTarget.classList.contains('jira-column')) {
-                const newColumnId = e.currentTarget.dataset.columnId;
-                if (oldColumnId !== newColumnId) sendAction({ type: 'task_move', task_id: draggedItem.dataset.taskId, new_column_id: newColumnId, old_column_id: oldColumnId });
-            }
-        });
-    });
-
-    eventsContainer.addEventListener('click', handleActionClick);
-
-    // Start with the main menu
-    showMainMenu();
-
-    // --- Экспонируем функции для тестирования ---
-    window.endMinigame = endMinigame;
+    init();
 });
