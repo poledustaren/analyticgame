@@ -370,3 +370,226 @@ body {
 .resource-avatar:active {
     cursor: grabbing;
 }
+
+/* --- SPRINT SECTION --- */
+.sprint-phase {
+    background-color: var(--accent-primary);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 12px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 12px;
+    margin-bottom: 10px;
+}
+
+.sprint-phase.planning { background-color: var(--accent-primary); }
+.sprint-phase.active { background-color: var(--accent-success); }
+.sprint-phase.review { background-color: var(--accent-warning); }
+.sprint-phase.retro { background-color: #8b5cf6; }
+
+.sprint-metrics {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.sprint-metric {
+    flex: 1;
+    background-color: var(--bg-card);
+    padding: 8px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.sprint-metric .label {
+    display: block;
+    font-size: 10px;
+    color: var(--text-secondary);
+}
+
+.sprint-metric .value {
+    display: block;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+/* --- SPRINT MODAL --- */
+.sprint-modal {
+    background-color: var(--bg-panel);
+    border-radius: 16px;
+    width: 90%;
+    max-width: 700px;
+    max-height: 80vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+
+.sprint-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sprint-modal-header h2 {
+    font-size: 20px;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 28px;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+}
+
+.close-btn:hover {
+    color: var(--text-primary);
+}
+
+.sprint-modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.sprint-section {
+    margin-bottom: 20px;
+}
+
+.sprint-section h3 {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.sprint-section input[type="text"],
+.sprint-section input[type="number"],
+.sprint-section textarea {
+    width: 100%;
+    padding: 10px;
+    background-color: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-family: inherit;
+    margin-bottom: 10px;
+}
+
+.sprint-section textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+.action-btn, .primary-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.action-btn {
+    background-color: var(--bg-card);
+    color: var(--text-primary);
+}
+
+.action-btn:hover {
+    background-color: var(--border-color);
+}
+
+.primary-btn {
+    background-color: var(--accent-primary);
+    color: white;
+}
+
+.primary-btn:hover {
+    background-color: #2563eb;
+}
+
+.sprint-list {
+    margin-top: 10px;
+}
+
+.sprint-list-item {
+    background-color: var(--bg-card);
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sprint-list-item::before {
+    content: "•";
+    color: var(--accent-primary);
+}
+
+.task-pool {
+    max-height: 150px;
+    overflow-y: auto;
+    background-color: var(--bg-dark);
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.sprint-backlog-tasks {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sprint-backlog-item {
+    background-color: var(--bg-card);
+    padding: 10px;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.sprint-backlog-item .task-title {
+    font-weight: 500;
+}
+
+.sprint-backlog-item .task-points {
+    background-color: var(--accent-primary);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+}
+
+.sprint-backlog-item .remove-btn {
+    background: none;
+    border: none;
+    color: var(--accent-danger);
+    cursor: pointer;
+    font-size: 18px;
+}
+
+.sprint-modal-footer {
+    padding: 20px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+/* --- SPRINT PHASE COLORS --- */
+.sprint-phase[data-phase="planning"] { background-color: var(--accent-primary); }
+.sprint-phase[data-phase="active"] { background-color: var(--accent-success); }
+.sprint-phase[data-phase="review"] { background-color: var(--accent-warning); }
+.sprint-phase[data-phase="retro"] { background-color: #8b5cf6; }
+

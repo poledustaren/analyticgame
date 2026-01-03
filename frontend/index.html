@@ -23,6 +23,22 @@
             </div>
 
             <div class="sidebar-section">
+                <h3>SPRINT <span id="sprint-number">1</span></h3>
+                <div class="sprint-phase" id="sprint-phase">PLANNING</div>
+                <div class="sprint-metrics">
+                    <div class="sprint-metric">
+                        <span class="label">Capacity</span>
+                        <span class="value" id="sprint-capacity">0</span>
+                    </div>
+                    <div class="sprint-metric">
+                        <span class="label">Velocity</span>
+                        <span class="value" id="sprint-velocity">0</span>
+                    </div>
+                </div>
+                <button id="open-sprint-modal" class="menu-btn">Sprint Details</button>
+            </div>
+
+            <div class="sidebar-section">
                 <h3>RESOURCES</h3>
                 <div id="resources-container">
                     <!-- Brent and others will appear here -->
@@ -134,6 +150,74 @@
     <!-- Minigame Modal Overlay (Preserved) -->
     <div id="minigame-modal" class="modal-overlay" style="display: none;">
         <!-- Content generated dynamically or same as before -->
+    </div>
+
+    <!-- Sprint Modal -->
+    <div id="sprint-modal" class="modal-overlay" style="display: none;">
+        <div class="sprint-modal">
+            <div class="sprint-modal-header">
+                <h2 id="sprint-modal-title">Sprint 1 - Planning</h2>
+                <button class="close-btn" id="close-sprint-modal">&times;</button>
+            </div>
+            <div class="sprint-modal-body">
+                <!-- Planning Phase Content -->
+                <div id="sprint-content-planning" class="sprint-phase-content">
+                    <div class="sprint-section">
+                        <h3>Sprint Goal</h3>
+                        <input type="text" id="sprint-goal-input" placeholder="Enter sprint goal...">
+                        <button id="add-sprint-goal" class="action-btn">Add Goal</button>
+                        <div id="sprint-goals-list" class="sprint-list"></div>
+                    </div>
+                    <div class="sprint-section">
+                        <h3>Capacity</h3>
+                        <input type="number" id="sprint-capacity-input" value="20" min="0">
+                        <button id="set-sprint-capacity" class="action-btn">Set Capacity</button>
+                    </div>
+                    <div class="sprint-section">
+                        <h3>Sprint Backlog</h3>
+                        <div id="available-tasks" class="task-pool"></div>
+                        <div class="sprint-backlog-tasks" id="sprint-backlog-tasks"></div>
+                    </div>
+                </div>
+
+                <!-- Active Phase Content -->
+                <div id="sprint-content-active" class="sprint-phase-content" style="display: none;">
+                    <div class="sprint-section">
+                        <h3>Active Sprint</h3>
+                        <p>Work on your sprint backlog tasks. Move them to Done as you complete them.</p>
+                        <div id="active-sprint-tasks" class="sprint-backlog-tasks"></div>
+                    </div>
+                </div>
+
+                <!-- Review Phase Content -->
+                <div id="sprint-content-review" class="sprint-phase-content" style="display: none;">
+                    <div class="sprint-section">
+                        <h3>Sprint Review</h3>
+                        <p>Completed: <span id="review-velocity">0</span> / <span id="review-capacity">0</span> points</p>
+                        <div id="review-tasks" class="sprint-backlog-tasks"></div>
+                    </div>
+                </div>
+
+                <!-- Retro Phase Content -->
+                <div id="sprint-content-retro" class="sprint-phase-content" style="display: none;">
+                    <div class="sprint-section">
+                        <h3>Sprint Retrospective</h3>
+                        <textarea id="retro-note" placeholder="What went well? What to improve?"></textarea>
+                        <button id="save-retro-note" class="action-btn">Save Note</button>
+                    </div>
+                    <div class="sprint-section">
+                        <h3>Action Items</h3>
+                        <input type="text" id="retro-action-input" placeholder="New action item...">
+                        <button id="add-retro-action" class="action-btn">Add Action</button>
+                        <div id="retro-actions-list" class="sprint-list"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="sprint-modal-footer">
+                <button id="advance-sprint-phase" class="primary-btn">Advance Phase</button>
+                <button id="complete-sprint" class="primary-btn" style="display: none;">Complete Sprint</button>
+            </div>
+        </div>
     </div>
 
     <script src="script.js"></script>

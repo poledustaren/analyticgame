@@ -25,6 +25,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatLog = document.getElementById('chat-log');
     const tabBtns = document.querySelectorAll('.tab-btn');
     const tabContents = document.querySelectorAll('.tab-content');
+    // Sprint Elements
+    const sprintNumber = document.getElementById('sprint-number');
+    const sprintPhase = document.getElementById('sprint-phase');
+    const sprintCapacity = document.getElementById('sprint-capacity');
+    const sprintVelocity = document.getElementById('sprint-velocity');
+    const openSprintModal = document.getElementById('open-sprint-modal');
+    const sprintModal = document.getElementById('sprint-modal');
+    const closeSprintModal = document.getElementById('close-sprint-modal');
+    const advanceSprintPhase = document.getElementById('advance-sprint-phase');
+    const completeSprint = document.getElementById('complete-sprint');
 
     // --- State Management ---
     let currentState = null;
@@ -34,6 +44,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // Attach Event Listeners
         newGameBtn.onclick = startNewGame;
         saveGameBtn.onclick = handleSaveGame;
+
+        // Sprint Event Listeners
+        openSprintModal.onclick = () => sprintModal.style.display = 'flex';
+        closeSprintModal.onclick = () => sprintModal.style.display = 'none';
+        advanceSprintPhase.onclick = handleAdvanceSprintPhase;
+        completeSprint.onclick = handleCompleteSprint;
 
         tabBtns.forEach(btn => {
             btn.addEventListener('click', () => {
@@ -113,7 +129,121 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 4. Logs
         renderLogs(state.mentor_log, state.chat_history);
+
+        // 5. Sprint
+        renderSprint(state.current_sprint);
     }
+
+    function renderSprint(sprint) {
+        if (!sprint) return;
+
+        sprintNumber.textContent = sprint.sprint_number;
+        sprintPhase.textContent = sprint.phase.toUpperCase();
+        sprintPhase.dataset.phase = sprint.phase;
+        sprintPhase.className = `sprint-phase ${sprint.phase}`;
+
+        sprintCapacity.textContent = sprint.capacity;
+        sprintVelocity.textContent = sprint.velocity;
+
+        // Update modal title
+        document.getElementById('sprint-modal-title').textContent =
+            `Sprint ${sprint.sprint_number} - ${sprint.phase.charAt(0).toUpperCase() + sprint.phase.slice(1)}`;
+
+        // Show appropriate phase content
+        document.querySelectorAll('.sprint-phase-content').forEach(el => el.style.display = 'none');
+        const phaseContent = document.getElementById(`sprint-content-${sprint.phase}`);
+        if (phaseContent) phaseContent.style.display = 'block';
+
+        // Show/hide complete button
+        completeSprint.style.display = sprint.phase === 'retro' ? 'block' : 'none';
+
+        // Render sprint goals
+        const goalsList = document.getElementById('sprint-goals-list');
+        if (goalsList) {
+            goalsList.innerHTML = sprint.sprint_goals.map(g =>
+                `<div class="sprint-list-item">${g}</div>`
+            ).join('');
+        }
+
+        // Render retro actions
+        const retroActionsList = document.getElementById('retro-actions-list');
+        if (retroActionsList) {
+            retroActionsList.innerHTML = sprint.retro_actions.map(a =>
+                `<div class="sprint-list-item">${a}</div>`
+            ).join('');
+        }
+
+        // Render sprint backlog tasks
+        renderSprintBacklog(sprint);
+    }
+
+    function renderSprintBacklog(sprint) {
+        const backlogContainer = document.getElementById('sprint-backlog-tasks');
+        const activeContainer = document.getElementById('active-sprint-tasks');
+        const reviewContainer = document.getElementById('review-tasks');
+        const availableContainer = document.getElementById('available-tasks');
+
+        if (!currentState) return;
+
+        // Available tasks (not in sprint)
+        if (availableContainer) {
+            const allTasks = [...currentState.tasks.backlog, ...currentState.tasks.in_progress];
+            const availableTasks = allTasks.filter(t => !sprint.sprint_backlog.includes(t.id));
+
+            availableContainer.innerHTML = availableTasks.map(task =>
+                `<div class="sprint-backlog-item" onclick="addToSprint('${task.id}')">
+                    <span class="task-title">${task.title}</span>
+                    <span class="task-points">${task.points} pts</span>
+                </div>`
+            ).join('');
+        }
+
+        // Sprint backlog tasks
+        const sprintTasks = sprint.sprint_backlog.map(taskId => {
+            for (const col of Object.values(currentState.tasks)) {
+                const task = col.find(t => t.id === taskId);
+                if (task) return task;
+            }
+            return null;
+        }).filter(Boolean);
+
+        const renderSprintTasks = (container, tasks) => {
+            if (!container) return;
+            container.innerHTML = tasks.map(task =>
+                `<div class="sprint-backlog-item">
+                    <span class="task-title">${task.title}</span>
+                    <span class="task-points">${task.points} pts</span>
+                </div>`
+            ).join('');
+        };
+
+        renderSprintTasks(backlogContainer, sprintTasks);
+        renderSprintTasks(activeContainer, sprintTasks);
+        renderSprintTasks(reviewContainer, sprintTasks);
+    }
+
+    async function handleAdvanceSprintPhase() {
+        await sendAction({ type: 'sprint_advance_phase' });
+    }
+
+    async function handleCompleteSprint() {
+        await sendAction({ type: 'sprint_complete' });
+    }
+
+    // Global function for onclick in HTML
+    window.addToSprint = async function(taskId) {
+        await sendAction({ type: 'sprint_add_task', task_id: taskId });
+    };
+
+    window.removeFromSprint = async function(taskId) {
+        await fetch(`${API_BASE_URL}/sprint/task`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task_id: taskId })
+        });
+        const newState = await fetch(`${API_BASE_URL}/state`).then(r => r.json());
+        render(newState);
+    };
 
     function renderResources(resources) {
         resourcePool.innerHTML = '';
