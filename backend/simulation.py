@@ -2,14 +2,61 @@ import random
 import json
 import os
 import glob
+from datetime import datetime, timedelta
+from enum import Enum
 
 SAVES_DIR = os.path.join(os.path.dirname(__file__), 'saves')
+
+class SprintPhase(Enum):
+    PLANNING = "planning"
+    ACTIVE = "active"
+    REVIEW = "review"
+    RETRO = "retro"
+    COMPLETED = "completed"
 
 class WorkType:
     BUSINESS = "business"
     INTERNAL = "internal"
     CHANGES = "changes"
     UNPLANNED = "unplanned"
+
+class Sprint:
+    """Модель спринта с фазами и целями."""
+    def __init__(self, sprint_id: int, goal: str = "", duration_weeks: int = 2):
+        self.id = sprint_id
+        self.phase = SprintPhase.PLANNING
+        self.goal = goal
+        self.duration_weeks = duration_weeks
+        self.current_week = 0
+
+        # Задачи, выбранные для спринта
+        self.task_ids = []
+
+        # Velocity tracking (story points completed)
+        self.planned_velocity = 0
+        self.actual_velocity = 0
+
+        # Timestamps
+        self.start_time = None
+        self.end_time = None
+
+        # Retrospective notes
+        self.retro_notes = []
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "phase": self.phase.value,
+            "goal": self.goal,
+            "duration_weeks": self.duration_weeks,
+            "current_week": self.current_week,
+            "task_ids": self.task_ids,
+            "planned_velocity": self.planned_velocity,
+            "actual_velocity": self.actual_velocity,
+            "start_time": self.start_time.isoformat() if self.start_time else None,
+            "end_time": self.end_time.isoformat() if self.end_time else None,
+            "retro_notes": self.retro_notes
+        }
 
 class GameState:
     """Хранит все данные о текущем состоянии игры."""
@@ -43,10 +90,45 @@ class GameState:
 
         self.active_events = []
 
-    def to_dict(self): return self.__dict__
+        # Sprint System
+        self.current_sprint = None
+        self.sprint_history = []
+        self.velocity_history = []  # Track velocity across sprints
+        self.sprint_counter = 1
+
+    def to_dict(self):
+        data = self.__dict__.copy()
+        if self.current_sprint:
+            data['current_sprint'] = self.current_sprint.to_dict()
+        data['sprint_history'] = [s.to_dict() for s in self.sprint_history]
+        return data
+
     @classmethod
     def from_dict(cls, data):
         instance = cls()
+        # Handle sprint deserialization
+        if 'current_sprint' in data and data['current_sprint']:
+            sprint_data = data['current_sprint']
+            sprint = Sprint(sprint_data['id'], sprint_data.get('goal', ''), sprint_data.get('duration_weeks', 2))
+            sprint.__dict__.update(sprint_data)
+            sprint.phase = SprintPhase(sprint_data.get('phase', 'planning'))
+            if sprint_data.get('start_time'):
+                sprint.start_time = datetime.fromisoformat(sprint_data['start_time'])
+            if sprint_data.get('end_time'):
+                sprint.end_time = datetime.fromisoformat(sprint_data['end_time'])
+            data['current_sprint'] = sprint
+        if 'sprint_history' in data:
+            sprints = []
+            for sprint_data in data['sprint_history']:
+                sprint = Sprint(sprint_data['id'], sprint_data.get('goal', ''), sprint_data.get('duration_weeks', 2))
+                sprint.__dict__.update(sprint_data)
+                sprint.phase = SprintPhase(sprint_data.get('phase', 'planning'))
+                if sprint_data.get('start_time'):
+                    sprint.start_time = datetime.fromisoformat(sprint_data['start_time'])
+                if sprint_data.get('end_time'):
+                    sprint.end_time = datetime.fromisoformat(sprint_data['end_time'])
+                sprints.append(sprint)
+            data['sprint_history'] = sprints
         instance.__dict__.update(data)
         return instance
 
@@ -120,6 +202,13 @@ class SimulationEngine:
         elif action_type == 'set_wip_limit': self._handle_set_wip_limit(action)
         elif action_type == 'minigame_result': self._handle_minigame_result(action)
         elif action_type == 'assign_resource': self._handle_assign_resource(action)
+        # Sprint actions
+        elif action_type == 'sprint_create': self._handle_sprint_create(action)
+        elif action_type == 'sprint_start': self._handle_sprint_start(action)
+        elif action_type == 'sprint_add_task': self._handle_sprint_add_task(action)
+        elif action_type == 'sprint_remove_task': self._handle_sprint_remove_task(action)
+        elif action_type == 'sprint_end': self._handle_sprint_end(action)
+        elif action_type == 'sprint_complete_retro': self._handle_sprint_complete_retro(action)
 
         self._check_level_transition()
         return self.active_game_state.to_dict()
@@ -263,5 +352,122 @@ class SimulationEngine:
 
     def _handle_minigame_result(self, action):
         pass
+
+    # --- Sprint Action Handlers ---
+
+    def _handle_sprint_create(self, action):
+        """Создать новый спринт в фазе Planning."""
+        state = self.active_game_state
+        if state.current_sprint and state.current_sprint.phase != SprintPhase.COMPLETED:
+            state.chat_history.append({"sender": "System", "text": "Активный спринт уже существует. Завершите его перед созданием нового."})
+            return
+
+        goal = action.get('goal', '')
+        duration = action.get('duration_weeks', 2)
+
+        new_sprint = Sprint(state.sprint_counter, goal, duration)
+        state.current_sprint = new_sprint
+        state.sprint_counter += 1
+
+        state.chat_history.append({"sender": "System", "text": f"Sprint {new_sprint.id} создан. Установите цель и выберите задачи."})
+        state.mentor_log.append({"sender": "Эрик", "text": "Planning фаза. Выберите задачи, которые команда может реально завершить. Не переоценивайте свою capacity."})
+
+    def _handle_sprint_start(self, action):
+        """Запустить спринт (Planning → Active)."""
+        state = self.active_game_state
+        if not state.current_sprint:
+            return
+
+        if state.current_sprint.phase != SprintPhase.PLANNING:
+            state.chat_history.append({"sender": "System", "text": "Спринт можно запустить только из фазы Planning."})
+            return
+
+        if not state.current_sprint.task_ids:
+            state.chat_history.append({"sender": "System", "text": "Добавьте хотя бы одну задачу в спринт!"})
+            return
+
+        state.current_sprint.phase = SprintPhase.ACTIVE
+        state.current_sprint.start_time = datetime.now()
+        state.current_sprint.current_week = 1
+
+        # Calculate planned velocity
+        planned_points = 0
+        for task_id in state.current_sprint.task_ids:
+            for col in state.tasks.values():
+                for t in col:
+                    if t['id'] == task_id:
+                        planned_points += t.get('points', 0)
+                        break
+        state.current_sprint.planned_velocity = planned_points
+
+        state.chat_history.append({"sender": "System", "text": f"Sprint {state.current_sprint.id} запущен! Goal: {state.current_sprint.goal}"})
+        state.mentor_log.append({"sender": "Эрик", "text": "Спринт начался. Фокусируйтесь на завершении задач, не начинайте новые."})
+
+    def _handle_sprint_add_task(self, action):
+        """Добавить задачу в backlog спринта."""
+        state = self.active_game_state
+        if not state.current_sprint or state.current_sprint.phase != SprintPhase.PLANNING:
+            state.chat_history.append({"sender": "System", "text": "Задачи можно добавлять только в фазе Planning."})
+            return
+
+        task_id = action.get('task_id')
+        if task_id not in state.current_sprint.task_ids:
+            state.current_sprint.task_ids.append(task_id)
+
+    def _handle_sprint_remove_task(self, action):
+        """Удалить задачу из backlog спринта."""
+        state = self.active_game_state
+        if not state.current_sprint or state.current_sprint.phase != SprintPhase.PLANNING:
+            return
+
+        task_id = action.get('task_id')
+        if task_id in state.current_sprint.task_ids:
+            state.current_sprint.task_ids.remove(task_id)
+
+    def _handle_sprint_end(self, action):
+        """Завершить спринт (Active → Review → Retro)."""
+        state = self.active_game_state
+        if not state.current_sprint or state.current_sprint.phase != SprintPhase.ACTIVE:
+            return
+
+        # Calculate actual velocity (points in done)
+        actual_points = 0
+        for task_id in state.current_sprint.task_ids:
+            for t in state.tasks['done']:
+                if t['id'] == task_id:
+                    actual_points += t.get('points', 0)
+                    break
+
+        state.current_sprint.actual_velocity = actual_points
+        state.current_sprint.phase = SprintPhase.REVIEW
+        state.current_sprint.end_time = datetime.now()
+
+        state.chat_history.append({"sender": "System", "text": f"Sprint Review! Завершено: {actual_points}/{state.current_sprint.planned_velocity} pts."})
+        state.mentor_log.append({"sender": "Эрик", "text": "Время для Sprint Review. Посмотрите, что было доставлено. Затем переходите к Retro."})
+
+    def _handle_sprint_complete_retro(self, action):
+        """Завершить ретроспективу и закрыть спринт."""
+        state = self.active_game_state
+        if not state.current_sprint or state.current_sprint.phase != SprintPhase.REVIEW:
+            return
+
+        retro_notes = action.get('notes', '')
+        if retro_notes:
+            state.current_sprint.retro_notes.append(retro_notes)
+
+        # Move to history
+        state.current_sprint.phase = SprintPhase.COMPLETED
+        state.sprint_history.append(state.current_sprint)
+        state.velocity_history.append({
+            "sprint_id": state.current_sprint.id,
+            "planned": state.current_sprint.planned_velocity,
+            "actual": state.current_sprint.actual_velocity
+        })
+
+        completed_sprint_id = state.current_sprint.id
+        state.current_sprint = None
+
+        state.chat_history.append({"sender": "System", "text": f"Sprint {completed_sprint_id} завершен. Готовы к новому циклу!"})
+        state.mentor_log.append({"sender": "Эрик", "text": "Ретроспектива завершена. Что вы улучшите в следующем спринте?"})
 
 engine = SimulationEngine()

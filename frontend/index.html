@@ -22,6 +22,15 @@
                 <p class="level-title">The Stabilizer</p>
             </div>
 
+            <!-- SPRINT PANEL -->
+            <div class="sidebar-section sprint-section">
+                <h3>SPRINT</h3>
+                <div id="sprint-status">
+                    <p class="no-sprint">No active sprint</p>
+                </div>
+                <button id="sprint-btn" class="sprint-btn">Start Sprint</button>
+            </div>
+
             <div class="sidebar-section">
                 <h3>RESOURCES</h3>
                 <div id="resources-container">
@@ -69,6 +78,33 @@
                 </div>
             </header>
 
+            <!-- Sprint Phases Bar (visible when sprint active) -->
+            <div id="sprint-phases-bar" class="sprint-phases-bar" style="display: none;">
+                <div class="phase" data-phase="planning">
+                    <span class="phase-icon">📋</span>
+                    <span class="phase-name">Planning</span>
+                </div>
+                <div class="phase-arrow">→</div>
+                <div class="phase" data-phase="active">
+                    <span class="phase-icon">🚀</span>
+                    <span class="phase-name">Active</span>
+                </div>
+                <div class="phase-arrow">→</div>
+                <div class="phase" data-phase="review">
+                    <span class="phase-icon">👀</span>
+                    <span class="phase-name">Review</span>
+                </div>
+                <div class="phase-arrow">→</div>
+                <div class="phase" data-phase="retro">
+                    <span class="phase-icon">💡</span>
+                    <span class="phase-name">Retro</span>
+                </div>
+                <div class="sprint-goal-display">
+                    <span class="goal-label">GOAL:</span>
+                    <span id="sprint-goal-text" class="goal-text">-</span>
+                </div>
+            </div>
+
             <!-- Kanban Board -->
             <div id="board-container">
                 <div class="kanban-column" id="backlog" data-column-id="backlog">
@@ -103,6 +139,14 @@
                     <div class="task-list"></div>
                 </div>
             </div>
+
+            <!-- Velocity Chart (bottom of main content) -->
+            <div id="velocity-section" class="velocity-section">
+                <h3>VELOCITY HISTORY</h3>
+                <div id="velocity-chart" class="velocity-chart">
+                    <div class="velocity-empty">Complete sprints to see velocity trend</div>
+                </div>
+            </div>
         </main>
 
         <!-- RIGHT PANEL: Mentor & Comms -->
@@ -131,9 +175,105 @@
 
     </div>
 
-    <!-- Minigame Modal Overlay (Preserved) -->
-    <div id="minigame-modal" class="modal-overlay" style="display: none;">
-        <!-- Content generated dynamically or same as before -->
+    <!-- PLANNING MODAL -->
+    <div id="planning-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content planning-modal">
+            <div class="modal-header">
+                <h2>📋 Sprint Planning</h2>
+                <button class="modal-close" id="planning-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="planning-section">
+                    <label>Sprint Goal</label>
+                    <input type="text" id="sprint-goal-input" placeholder="What's the focus of this sprint?">
+                </div>
+                <div class="planning-section">
+                    <label>Duration (weeks)</label>
+                    <select id="sprint-duration">
+                        <option value="1">1 week</option>
+                        <option value="2" selected>2 weeks</option>
+                        <option value="3">3 weeks</option>
+                    </select>
+                </div>
+                <div class="planning-section">
+                    <label>Select Tasks (drag or click to add)</label>
+                    <div class="planning-tasks-container">
+                        <div class="planning-col">
+                            <h4>Available Tasks</h4>
+                            <div id="planning-backlog" class="planning-task-list"></div>
+                        </div>
+                        <div class="planning-col">
+                            <h4>Sprint Backlog <span id="sprint-velocity-preview" class="velocity-preview">0 pts</span></h4>
+                            <div id="planning-sprint-backlog" class="planning-task-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn secondary" id="planning-cancel">Cancel</button>
+                <button class="modal-btn primary" id="planning-confirm">Create Sprint</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SPRINT REVIEW MODAL -->
+    <div id="review-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content review-modal">
+            <div class="modal-header">
+                <h2>👀 Sprint Review</h2>
+            </div>
+            <div class="modal-body">
+                <div class="review-stats">
+                    <div class="review-stat">
+                        <span class="stat-label">Planned</span>
+                        <span class="stat-value" id="review-planned">0</span>
+                        <span class="stat-unit">pts</span>
+                    </div>
+                    <div class="review-stat">
+                        <span class="stat-label">Completed</span>
+                        <span class="stat-value" id="review-completed">0</span>
+                        <span class="stat-unit">pts</span>
+                    </div>
+                    <div class="review-stat">
+                        <span class="stat-label">Velocity</span>
+                        <span class="stat-value" id="review-velocity">0%</span>
+                        <span class="stat-unit">achieved</span>
+                    </div>
+                </div>
+                <div id="review-tasks" class="review-tasks"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn primary" id="review-to-retro">Continue to Retro</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- RETRO MODAL -->
+    <div id="retro-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content retro-modal">
+            <div class="modal-header">
+                <h2>💡 Sprint Retrospective</h2>
+            </div>
+            <div class="modal-body">
+                <div class="retro-columns">
+                    <div class="retro-col">
+                        <h4>🎉 Went Well</h4>
+                        <textarea id="retro-went-well" placeholder="What went well this sprint?"></textarea>
+                    </div>
+                    <div class="retro-col">
+                        <h4>⚠️ Could Be Better</h4>
+                        <textarea id="retro-issues" placeholder="What could be improved?"></textarea>
+                    </div>
+                    <div class="retro-col">
+                        <h4>🎯 Action Items</h4>
+                        <textarea id="retro-actions" placeholder="What will we do differently?"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn primary" id="retro-complete">Complete Sprint</button>
+            </div>
+        </div>
     </div>
 
     <script src="script.js"></script>

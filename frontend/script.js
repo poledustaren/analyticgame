@@ -6,10 +6,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const appLayout = document.getElementById('app-layout');
     // Sidebar
     const levelDisplay = document.getElementById('level-display');
-    const levelTitle = document.querySelector('.level-title'); // Need to update this text
+    const levelTitle = document.querySelector('.level-title');
     const resourcePool = document.getElementById('resource-pool');
     const newGameBtn = document.getElementById('new-game-btn');
     const saveGameBtn = document.getElementById('save-game-btn');
+    // Sprint Elements
+    const sprintStatus = document.getElementById('sprint-status');
+    const sprintBtn = document.getElementById('sprint-btn');
+    const sprintPhasesBar = document.getElementById('sprint-phases-bar');
+    const sprintGoalText = document.getElementById('sprint-goal-text');
     // Metrics
     const metricBudget = document.getElementById('metric-budget');
     const metricStability = document.getElementById('metric-stability');
@@ -19,21 +24,48 @@ document.addEventListener('DOMContentLoaded', () => {
     // Board
     const wipCurrent = document.getElementById('wip-current');
     const wipLimit = document.getElementById('wip-limit');
-    const wipBadge = document.querySelector('.wip-badge'); // For coloring
+    const wipBadge = document.querySelector('.wip-badge');
     // Panels
     const mentorLog = document.getElementById('mentor-log');
     const chatLog = document.getElementById('chat-log');
     const tabBtns = document.querySelectorAll('.tab-btn');
     const tabContents = document.querySelectorAll('.tab-content');
+    // Velocity
+    const velocityChart = document.getElementById('velocity-chart');
+    // Modals
+    const planningModal = document.getElementById('planning-modal');
+    const planningClose = document.getElementById('planning-close');
+    const planningCancel = document.getElementById('planning-cancel');
+    const planningConfirm = document.getElementById('planning-confirm');
+    const sprintGoalInput = document.getElementById('sprint-goal-input');
+    const sprintDuration = document.getElementById('sprint-duration');
+    const planningBacklog = document.getElementById('planning-backlog');
+    const planningSprintBacklog = document.getElementById('planning-sprint-backlog');
+    const sprintVelocityPreview = document.getElementById('sprint-velocity-preview');
+    const reviewModal = document.getElementById('review-modal');
+    const reviewToRetroBtn = document.getElementById('review-to-retro');
+    const retroModal = document.getElementById('retro-modal');
+    const retroCompleteBtn = document.getElementById('retro-complete');
 
     // --- State Management ---
     let currentState = null;
+    let planningSprintTasks = []; // Tasks selected during planning
 
     // --- Initialization ---
     function init() {
         // Attach Event Listeners
         newGameBtn.onclick = startNewGame;
         saveGameBtn.onclick = handleSaveGame;
+
+        // Sprint Event Listeners
+        sprintBtn.onclick = handleSprintButtonClick;
+
+        // Modal Event Listeners
+        planningClose.onclick = closePlanningModal;
+        planningCancel.onclick = closePlanningModal;
+        planningConfirm.onclick = createSprint;
+        reviewToRetroBtn.onclick = goToRetro;
+        retroCompleteBtn.onclick = completeRetro;
 
         tabBtns.forEach(btn => {
             btn.addEventListener('click', () => {
@@ -105,14 +137,118 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (unplannedPct > 20) metricUnplannedBar.style.backgroundColor = '#f59e0b'; // Orange
         else metricUnplannedBar.style.backgroundColor = '#22c55e'; // Green
 
-        // 2. Resources (Brent)
+        // 2. Sprint UI
+        renderSprint(state);
+
+        // 3. Resources (Brent)
         renderResources(state.resources);
 
-        // 3. Board
+        // 4. Board
         renderBoard(state.tasks, state.wip_limit);
 
-        // 4. Logs
+        // 5. Logs
         renderLogs(state.mentor_log, state.chat_history);
+
+        // 6. Velocity Chart
+        renderVelocity(state.velocity_history || []);
+    }
+
+    // --- Sprint Rendering ---
+    function renderSprint(state) {
+        const sprint = state.current_sprint;
+
+        if (!sprint) {
+            // No active sprint
+            sprintStatus.innerHTML = '<p class="no-sprint">No active sprint</p>';
+            sprintBtn.textContent = 'Start Sprint';
+            sprintBtn.className = 'sprint-btn';
+            sprintPhasesBar.style.display = 'none';
+            sprintGoalText.textContent = '-';
+            return;
+        }
+
+        // Active sprint exists
+        sprintPhasesBar.style.display = 'flex';
+        sprintGoalText.textContent = sprint.goal || '-';
+
+        // Update phase indicators
+        const phases = ['planning', 'active', 'review', 'retro'];
+        const phaseIndex = phases.indexOf(sprint.phase);
+
+        document.querySelectorAll('.phase').forEach((el, idx) => {
+            el.classList.remove('active', 'completed');
+            if (idx < phaseIndex) {
+                el.classList.add('completed');
+            } else if (idx === phaseIndex) {
+                el.classList.add('active');
+            }
+        });
+
+        // Update sidebar sprint status
+        const phaseEmoji = {
+            planning: '📋',
+            active: '🚀',
+            review: '👀',
+            retro: '💡'
+        };
+
+        sprintStatus.innerHTML = `
+            <div class="sprint-info">
+                <div class="sprint-info-phase">
+                    <span>${phaseEmoji[sprint.phase] || '📋'}</span>
+                    <span>Sprint ${sprint.id}</span>
+                </div>
+                <div class="sprint-info-goal">"${sprint.goal || 'No goal set'}"</div>
+                ${sprint.phase === 'active' ? `
+                <div class="sprint-info-velocity">
+                    <span>Planned: ${sprint.planned_velocity} pts</span>
+                    <span>Week ${sprint.current_week}/${sprint.duration_weeks}</span>
+                </div>
+                ` : ''}
+            </div>
+        `;
+
+        // Update button based on phase
+        if (sprint.phase === 'planning') {
+            sprintBtn.textContent = 'Launch Sprint';
+            sprintBtn.className = 'sprint-btn';
+        } else if (sprint.phase === 'active') {
+            sprintBtn.textContent = 'End Sprint';
+            sprintBtn.className = 'sprint-btn secondary';
+        } else if (sprint.phase === 'review') {
+            // Review modal should be open
+            showReviewModal(sprint, state);
+        } else if (sprint.phase === 'retro') {
+            // Retro modal should be open
+            sprintBtn.textContent = 'In Retro';
+            sprintBtn.className = 'sprint-btn secondary';
+        }
+    }
+
+    function renderVelocity(velocityHistory) {
+        if (!velocityHistory || velocityHistory.length === 0) {
+            velocityChart.innerHTML = '<div class="velocity-empty">Complete sprints to see velocity trend</div>';
+            return;
+        }
+
+        const maxVelocity = Math.max(
+            ...velocityHistory.map(v => Math.max(v.planned, v.actual))
+        );
+
+        velocityChart.innerHTML = velocityHistory.map(v => {
+            const plannedHeight = maxVelocity > 0 ? (v.planned / maxVelocity) * 80 : 0;
+            const actualHeight = maxVelocity > 0 ? (v.actual / maxVelocity) * 80 : 0;
+
+            return `
+                <div class="velocity-bar-group">
+                    <div class="velocity-bars">
+                        <div class="velocity-bar planned" style="height: ${plannedHeight}px" title="Planned: ${v.planned}"></div>
+                        <div class="velocity-bar actual" style="height: ${actualHeight}px" title="Actual: ${v.actual}"></div>
+                    </div>
+                    <span class="velocity-label">S${v.sprint_id}</span>
+                </div>
+            `;
+        }).join('');
     }
 
     function renderResources(resources) {
@@ -301,6 +437,199 @@ document.addEventListener('DOMContentLoaded', () => {
                     task_id: taskId
                 });
             }
+        });
+    }
+
+    // --- Sprint Action Handlers ---
+
+    function handleSprintButtonClick() {
+        if (!currentState) return;
+
+        if (!currentState.current_sprint) {
+            // Open Planning Modal to create new sprint
+            openPlanningModal();
+        } else if (currentState.current_sprint.phase === 'planning') {
+            // Launch the sprint
+            sendAction({ type: 'sprint_start' });
+        } else if (currentState.current_sprint.phase === 'active') {
+            // End sprint - go to review
+            sendAction({ type: 'sprint_end' });
+        }
+    }
+
+    function openPlanningModal() {
+        if (!currentState) return;
+
+        // Clear previous inputs
+        sprintGoalInput.value = '';
+        sprintDuration.value = '2';
+        planningSprintTasks = [];
+
+        // Populate available tasks from backlog
+        renderPlanningTasks();
+
+        planningModal.style.display = 'flex';
+    }
+
+    function closePlanningModal() {
+        planningModal.style.display = 'none';
+    }
+
+    function renderPlanningTasks() {
+        if (!currentState) return;
+
+        const backlogTasks = currentState.tasks.backlog || [];
+        const sprintTaskIds = currentState.current_sprint?.task_ids || [];
+
+        // Get tasks NOT already in sprint
+        const availableTasks = backlogTasks.filter(t => !sprintTaskIds.includes(t.id));
+
+        // Render available tasks
+        planningBacklog.innerHTML = availableTasks.map(task => `
+            <div class="planning-task-item" data-task-id="${task.id}">
+                <h5>${task.title}</h5>
+                <p>${task.description || ''}</p>
+                <span class="task-points">${task.points} pts</span>
+            </div>
+        `).join('');
+
+        // Render sprint backlog
+        renderSprintBacklog();
+
+        // Add click handlers to available tasks
+        planningBacklog.querySelectorAll('.planning-task-item').forEach(item => {
+            item.onclick = () => addToSprintBacklog(item.dataset.taskId);
+        });
+    }
+
+    function renderSprintBacklog() {
+        if (!currentState) return;
+
+        const sprintTaskIds = currentState.current_sprint?.task_ids || planningSprintTasks;
+        const allTasks = [
+            ...(currentState.tasks.backlog || []),
+            ...(currentState.tasks.in_progress || []),
+            ...(currentState.tasks.review || [])
+        ];
+
+        const sprintTasks = allTasks.filter(t => sprintTaskIds.includes(t.id));
+
+        // Calculate total points
+        const totalPoints = sprintTasks.reduce((sum, t) => sum + (t.points || 0), 0);
+        sprintVelocityPreview.textContent = `${totalPoints} pts`;
+
+        planningSprintBacklog.innerHTML = sprintTasks.map(task => `
+            <div class="planning-task-item" data-task-id="${task.id}">
+                <h5>${task.title}</h5>
+                <p>${task.description || ''}</p>
+                <span class="task-points">${task.points} pts</span>
+            </div>
+        `).join('');
+
+        // Add click handlers to sprint tasks (remove on click)
+        planningSprintBacklog.querySelectorAll('.planning-task-item').forEach(item => {
+            item.onclick = () => removeFromSprintBacklog(item.dataset.taskId);
+        });
+    }
+
+    function addToSprintBacklog(taskId) {
+        if (currentState?.current_sprint) {
+            sendAction({ type: 'sprint_add_task', task_id: taskId });
+        } else {
+            planningSprintTasks.push(taskId);
+            renderSprintBacklog();
+            // Remove from available
+            const item = planningBacklog.querySelector(`[data-task-id="${taskId}"]`);
+            if (item) item.remove();
+        }
+    }
+
+    function removeFromSprintBacklog(taskId) {
+        if (currentState?.current_sprint) {
+            sendAction({ type: 'sprint_remove_task', task_id: taskId });
+        } else {
+            planningSprintTasks = planningSprintTasks.filter(id => id !== taskId);
+            renderSprintBacklog();
+        }
+    }
+
+    async function createSprint() {
+        const goal = sprintGoalInput.value.trim();
+        const duration = parseInt(sprintDuration.value);
+
+        await sendAction({
+            type: 'sprint_create',
+            goal: goal,
+            duration_weeks: duration
+        });
+
+        // Add selected tasks to sprint
+        for (const taskId of planningSprintTasks) {
+            await sendAction({ type: 'sprint_add_task', task_id: taskId });
+        }
+
+        closePlanningModal();
+    }
+
+    function showReviewModal(sprint, state) {
+        if (reviewModal.style.display === 'flex') return; // Already open
+
+        const planned = sprint.planned_velocity || 0;
+        const actual = sprint.actual_velocity || 0;
+        const velocity = planned > 0 ? Math.round((actual / planned) * 100) : 0;
+
+        document.getElementById('review-planned').textContent = planned;
+        document.getElementById('review-completed').textContent = actual;
+        document.getElementById('review-velocity').textContent = `${velocity}%`;
+
+        // Show task completion status
+        const reviewTasks = document.getElementById('review-tasks');
+        const sprintTaskIds = sprint.task_ids || [];
+
+        const allTasks = [
+            ...(state.tasks.backlog || []),
+            ...(state.tasks.in_progress || []),
+            ...(state.tasks.review || []),
+            ...(state.tasks.done || [])
+        ];
+
+        const sprintTasks = allTasks.filter(t => sprintTaskIds.includes(t.id));
+
+        reviewTasks.innerHTML = sprintTasks.map(task => {
+            const isCompleted = state.tasks.done.some(t => t.id === task.id);
+            return `
+                <div class="review-task-item ${isCompleted ? 'completed' : 'not-completed'}">
+                    <span>${task.title}</span>
+                    <span>${task.points} pts ${isCompleted ? '✓' : '✗'}</span>
+                </div>
+            `;
+        }).join('');
+
+        reviewModal.style.display = 'flex';
+    }
+
+    function goToRetro() {
+        reviewModal.style.display = 'none';
+        retroModal.style.display = 'flex';
+    }
+
+    async function completeRetro() {
+        const wentWell = document.getElementById('retro-went-well').value.trim();
+        const issues = document.getElementById('retro-issues').value.trim();
+        const actions = document.getElementById('retro-actions').value.trim();
+
+        const notes = [wentWell, issues, actions].filter(n => n).join(' | ');
+
+        // Clear retro inputs
+        document.getElementById('retro-went-well').value = '';
+        document.getElementById('retro-issues').value = '';
+        document.getElementById('retro-actions').value = '';
+
+        retroModal.style.display = 'none';
+
+        await sendAction({
+            type: 'sprint_complete_retro',
+            notes: notes
         });
     }
 
