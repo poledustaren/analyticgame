@@ -36,6 +36,8 @@
                     </div>
                 </div>
                 <button id="open-sprint-modal" class="menu-btn">Sprint Details</button>
+                <button id="open-standup-modal" class="menu-btn">📢 Daily Standup</button>
+                <button id="open-cab-modal" class="menu-btn">📋 CAB / Changes</button>
             </div>
 
             <div class="sidebar-section">
@@ -216,6 +218,55 @@
             <div class="sprint-modal-footer">
                 <button id="advance-sprint-phase" class="primary-btn">Advance Phase</button>
                 <button id="complete-sprint" class="primary-btn" style="display: none;">Complete Sprint</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Daily Standup Modal -->
+    <div id="standup-modal" class="modal-overlay" style="display: none;">
+        <div class="standup-modal">
+            <div class="standup-modal-header">
+                <h2>📢 Daily Standup - Week <span id="standup-week">1</span></h2>
+                <button class="close-btn" id="close-standup-modal">&times;</button>
+            </div>
+            <div class="standup-modal-body">
+                <div id="standup-team-container"></div>
+                <div class="standup-summary">
+                    <p>Yesterday: What did you complete?</p>
+                    <p>Today: What will you work on?</p>
+                    <p>Blockers: What's blocking you?</p>
+                </div>
+            </div>
+            <div class="standup-modal-footer">
+                <button id="submit-standup" class="primary-btn">Complete Standup</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CAB Modal -->
+    <div id="cab-modal" class="modal-overlay" style="display: none;">
+        <div class="cab-modal">
+            <div class="cab-modal-header">
+                <h2>📋 Change Advisory Board</h2>
+                <button class="close-btn" id="close-cab-modal">&times;</button>
+            </div>
+            <div class="cab-modal-body">
+                <div class="cab-section">
+                    <h3>Submit New Change (RFC)</h3>
+                    <input type="text" id="cab-title" placeholder="Change title...">
+                    <textarea id="cab-description" placeholder="Describe the change..."></textarea>
+                    <select id="cab-risk">
+                        <option value="low">Low Risk</option>
+                        <option value="medium" selected>Medium Risk</option>
+                        <option value="high">High Risk</option>
+                        <option value="critical">Critical Risk</option>
+                    </select>
+                    <button id="submit-cab-change" class="action-btn">Submit RFC</button>
+                </div>
+                <div class="cab-section">
+                    <h3>Pending Changes</h3>
+                    <div id="cab-pending-list"></div>
+                </div>
             </div>
         </div>
     </div>

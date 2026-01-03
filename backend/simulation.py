@@ -125,6 +125,15 @@ class GameState:
         self.sprint_history = []  # Завершённые спринты
         self.sprint_enabled = True  # Включена ли система спринтов
 
+        # Daily Standup System
+        self.daily_standup_completed = False  # Проведен ли стендап сегодня
+        self.team_members = [
+            {"id": "dev1", "name": "Alex", "role": "Developer"},
+            {"id": "dev2", "name": "Sam", "role": "Developer"},
+            {"id": "qa", "name": "Pat", "role": "QA"}
+        ]
+        self.standup_answers = {}  # Ответы команды {member_id: {yesterday, today, blockers}}
+
         # Logs
         self.chat_history = [{"sender": "System", "text": "Добро пожаловать в симулятор 'Проект Феникс'!"}]
         self.mentor_log = [{"sender": "Эрик", "text": "Наблюдай за потоком работы. Где твое ограничение?"}]
@@ -143,6 +152,11 @@ class GameState:
         }
 
         self.active_events = []
+
+        # CAB (Change Advisory Board) System
+        self.pending_changes = []  # Запросы изменений на одобрение
+        self.cab_history = []  # История решений CAB
+        self.cab_meeting_scheduled = False
 
     def to_dict(self):
         """Сериализует состояние в словарь."""
@@ -251,6 +265,15 @@ class SimulationEngine:
         elif action_type == 'sprint_add_note': self._handle_sprint_add_note(action)
         elif action_type == 'sprint_add_retro_action': self._handle_sprint_add_retro_action(action)
         elif action_type == 'sprint_complete': self._handle_sprint_complete(action)
+        # Daily Standup actions
+        elif action_type == 'daily_standup_answer': self._handle_daily_standup_answer(action)
+        elif action_type == 'daily_standup_complete': self._handle_daily_standup_complete(action)
+        elif action_type == 'advance_day': self._handle_advance_day(action)
+        # CAB actions
+        elif action_type == 'cab_submit_change': self._handle_cab_submit_change(action)
+        elif action_type == 'cab_approve': self._handle_cab_approve(action)
+        elif action_type == 'cab_reject': self._handle_cab_reject(action)
+        elif action_type == 'cab_schedule_meeting': self._handle_cab_schedule_meeting(action)
 
         self._check_level_transition()
         return self.active_game_state.to_dict()
@@ -267,12 +290,12 @@ class SimulationEngine:
         state.tasks["done"] = []
 
         chaos_tasks = [
-            {"id": "task-pay-1", "title": "CRITICAL: Payroll Failure", "type": WorkType.UNPLANNED, "points": 8, "duration": 4, "required_resource": "brent", "assigned_resource": None, "description": "Зарплаты не ушли. CFO угрожает увольнением."},
-            {"id": "task-web-1", "title": "CRITICAL: Site Down 500 Error", "type": WorkType.UNPLANNED, "points": 5, "duration": 2, "required_resource": "brent", "assigned_resource": None, "description": "Главная страница не грузится. Маркетинг теряет лиды."},
-            {"id": "task-sec-1", "title": "Audit: PII Leak Vulnerability", "type": WorkType.UNPLANNED, "points": 3, "duration": 2, "required_resource": "brent", "assigned_resource": None, "description": "CISO нашел дыру в безопасности данных клиентов."}
+            {"id": "task-pay-1", "title": "CRITICAL: Payroll Failure", "type": WorkType.UNPLANNED, "points": 8, "duration": 4, "required_resource": "brent", "assigned_resource": None, "depends_on": [], "description": "Зарплаты не ушли. CFO угрожает увольнением."},
+            {"id": "task-web-1", "title": "CRITICAL: Site Down 500 Error", "type": WorkType.UNPLANNED, "points": 5, "duration": 2, "required_resource": "brent", "assigned_resource": None, "depends_on": [], "description": "Главная страница не грузится. Маркетинг теряет лиды."},
+            {"id": "task-sec-1", "title": "Audit: PII Leak Vulnerability", "type": WorkType.UNPLANNED, "points": 3, "duration": 2, "required_resource": "brent", "assigned_resource": None, "depends_on": ["task-web-1"], "description": "CISO нашел дыру в безопасности данных клиентов. Сначала почините сайт."}
         ]
 
-        phoenix_task = {"id": "task-phx-1", "title": "Project Phoenix: MVP Scope", "type": WorkType.BUSINESS, "points": 13, "duration": 10, "required_resource": None, "assigned_resource": None, "description": "Будущее компании. Но у нас нет времени на это."}
+        phoenix_task = {"id": "task-phx-1", "title": "Project Phoenix: MVP Scope", "type": WorkType.BUSINESS, "points": 13, "duration": 10, "required_resource": None, "assigned_resource": None, "depends_on": ["task-pay-1", "task-web-1", "task-sec-1"], "description": "Будущее компании. Но у нас нет времени на это."}
 
         state.tasks["in_progress"] = chaos_tasks
         state.tasks["backlog"] = [phoenix_task]
@@ -358,35 +381,70 @@ class SimulationEngine:
     def _handle_task_move(self, action):
         state = self.active_game_state
 
-        # WIP Limit Enforcement
-        if action.get('new_column_id') == 'in_progress':
-             current_wip = len(state.tasks['in_progress'])
-             if current_wip >= state.wip_limit:
-                 state.chat_history.append({"sender": "System", "text": "WIP Limit Exceeded! Finish existing tasks first."})
-                 state.mentor_log.append({"sender": "Эрик", "text": "Стоп! Ты нарушаешь WIP-лимит. Закончи начатое, прежде чем начинать новое."})
-                 return # Reject move
+        task_id = action.get('task_id')
+        new_column = action.get('new_column_id')
 
+        # Find the task first
         task_to_move = None
         source_list = state.tasks.get(action.get('old_column_id'))
         if not source_list: return
 
         for i, task in enumerate(source_list):
-            if task['id'] == action.get('task_id'):
+            if task['id'] == task_id:
                 task_to_move = source_list.pop(i)
                 break
 
-        if task_to_move:
-            destination_list = state.tasks.get(action.get('new_column_id'))
-            destination_list.append(task_to_move)
+        if not task_to_move:
+            return
 
-            if action.get('new_column_id') == 'done':
-                if task_to_move.get('assigned_resource'):
-                    res_id = task_to_move['assigned_resource']
-                    res = next((r for r in state.resources if r['id'] == res_id), None)
-                    if res:
-                        res['busy_task_id'] = None
-                        task_to_move['assigned_resource'] = None
-                        state.chat_history.append({"sender": "System", "text": f"{res['name']} освободился!"})
+        # Dependency Check: Task cannot move if dependencies not met
+        depends_on = task_to_move.get('depends_on', [])
+        if depends_on:
+            # Check if all dependencies are in 'done'
+            all_deps_done = all(
+                any(t['id'] == dep_id and col == 'done' for col in ['done'] for t in state.tasks[col])
+                for dep_id in depends_on
+            )
+            if not all_deps_done and new_column in ['in_progress', 'review', 'done']:
+                # Find which dependency is not done
+                incomplete_deps = []
+                for dep_id in depends_on:
+                    is_done = any(t['id'] == dep_id for t in state.tasks['done'])
+                    if not is_done:
+                        incomplete_deps.append(dep_id)
+
+                state.chat_history.append({
+                    "sender": "System",
+                    "text": f"❌ Blocked! Task depends on: {', '.join(incomplete_deps)}"
+                })
+                state.mentor_log.append({
+                    "sender": "Эрик",
+                    "text": "Зависимость! Ты не можешь начать эту задачу, пока не завершишь её зависимости."
+                })
+                # Put task back
+                source_list.append(task_to_move)
+                return
+
+        # WIP Limit Enforcement
+        if new_column == 'in_progress':
+             current_wip = len(state.tasks['in_progress'])
+             if current_wip >= state.wip_limit:
+                 state.chat_history.append({"sender": "System", "text": "WIP Limit Exceeded! Finish existing tasks first."})
+                 state.mentor_log.append({"sender": "Эрик", "text": "Стоп! Ты нарушаешь WIP-лимит. Закончи начатое, прежде чем начинать новое."})
+                 source_list.append(task_to_move)
+                 return # Reject move
+
+        destination_list = state.tasks.get(new_column)
+        destination_list.append(task_to_move)
+
+        if new_column == 'done':
+            if task_to_move.get('assigned_resource'):
+                res_id = task_to_move['assigned_resource']
+                res = next((r for r in state.resources if r['id'] == res_id), None)
+                if res:
+                    res['busy_task_id'] = None
+                    task_to_move['assigned_resource'] = None
+                    state.chat_history.append({"sender": "System", "text": f"{res['name']} освободился!"})
 
     def _handle_set_wip_limit(self, action):
         limit = action.get('limit')
@@ -503,5 +561,174 @@ class SimulationEngine:
         state.chat_history.append({"sender": "System", "text": f"✅ Sprint {old_sprint.sprint_number} completed! Velocity: {old_sprint.velocity}"})
         state.chat_history.append({"sender": "System", "text": f"🆕 Sprint {new_sprint_number} - Planning phase started!"})
         state.mentor_log.append({"sender": "Эрик", "text": f"Спринт {old_sprint.sprint_number} завершён. Скорость: {old_sprint.velocity}. Планируем следующий."})
+
+    # --- Daily Standup Action Handlers ---
+
+    def _handle_daily_standup_answer(self, action):
+        """Записывает ответ участника стендапа."""
+        state = self.active_game_state
+        member_id = action.get('member_id')
+        yesterday = action.get('yesterday', '')
+        today = action.get('today', '')
+        blockers = action.get('blockers', '')
+
+        if member_id not in state.standup_answers:
+            state.standup_answers[member_id] = {}
+
+        state.standup_answers[member_id] = {
+            'yesterday': yesterday,
+            'today': today,
+            'blockers': blockers
+        }
+
+        # Проверяем блокеры
+        if blockers and blockers.lower() not in ['none', 'no', 'нет', '']:
+            state.chat_history.append({
+                "sender": "System",
+                "text": f"⚠️ Blocker reported by {member_id}: {blockers}"
+            })
+            # Создаём задачу для разбора блокера
+            blocker_task = {
+                "id": f"task-blocker-{state.week}",
+                "title": f"Unblock: {blockers}",
+                "type": WorkType.INTERNAL,
+                "points": 2,
+                "duration": 1,
+                "description": f"Blocker from daily standup: {blockers}"
+            }
+            state.tasks["backlog"].append(blocker_task)
+
+    def _handle_daily_standup_complete(self, action):
+        """Завершает daily standup и даёт бонусы."""
+        state = self.active_game_state
+        if state.daily_standup_completed:
+            return {"error": "Standup already completed today"}
+
+        state.daily_standup_completed = True
+
+        # Бонус за стендап: +morale
+        state.morale = min(100, state.morale + 2)
+
+        # Проверяем все ли ответили
+        all_answered = all(m_id in state.standup_answers for m_id in [m['id'] for m in state.team_members])
+
+        if all_answered:
+            state.morale = min(100, state.morale + 3)
+            state.chat_history.append({"sender": "System", "text": "✅ Daily Standup complete! Team synced."})
+            state.mentor_log.append({"sender": "Эрик", "text": "Хороший стендап. Команда синхронизирована."})
+        else:
+            state.chat_history.append({"sender": "System", "text": "⚠️ Standup complete - some members missing."})
+
+    def _handle_advance_day(self, action):
+        """Переход к следующему дню/неделе."""
+        state = self.active_game_state
+
+        # Сбрасываем стендап
+        state.daily_standup_completed = False
+        state.standup_answers = {}
+
+        # Увеличиваем неделю (или день)
+        state.week += 1
+
+        # Триггер случайного события (30% шанс)
+        if random.random() < 0.3:
+            self._trigger_random_event()
+
+        state.chat_history.append({"sender": "System", "text": f"📅 Week {state.week} started."})
+
+    def _trigger_random_event(self):
+        """Генерирует случайное событие."""
+        state = self.active_game_state
+        events = [
+            {"type": "bug", "title": "Production Bug", "impact": "stability -5"},
+            {"type": "sick", "title": "Team Member Sick", "impact": "velocity -20%"},
+            {"type": "crunch", "title": "Scope Creep Request", "impact": "backlog +1"},
+            {"type": "win", "title": "Early Completion", "impact": "budget +1000"}
+        ]
+        event = random.choice(events)
+        state.active_events.append(event)
+        state.chat_history.append({"sender": "System", "text": f"⚡ EVENT: {event['title']} - {event['impact']}"})
+        state.mentor_log.append({"sender": "Эрик", "text": f"Событие! Адаптируйся. {event['title']}."})
+
+    # --- CAB (Change Advisory Board) Action Handlers ---
+
+    def _handle_cab_submit_change(self, action):
+        """Создаёт запрос на изменение (RFC)."""
+        state = self.active_game_state
+        title = action.get('title')
+        description = action.get('description', '')
+        risk_level = action.get('risk_level', 'medium')  # low, medium, high, critical
+
+        if not title:
+            return {"error": "Title is required"}
+
+        change_request = {
+            'id': f"cab-{len(state.pending_changes) + 1}",
+            'title': title,
+            'description': description,
+            'risk_level': risk_level,
+            'status': 'pending',  # pending, approved, rejected
+            'submitted_week': state.week
+        }
+
+        state.pending_changes.append(change_request)
+        state.chat_history.append({"sender": "System", "text": f"📋 Change Request submitted: {title}"})
+        state.mentor_log.append({"sender": "Эрик", "text": "RFC создан. CAB должен одобрить изменения перед внедрением."})
+
+    def _handle_cab_approve(self, action):
+        """Одобрить изменение CAB."""
+        state = self.active_game_state
+        change_id = action.get('change_id')
+
+        for change in state.pending_changes:
+            if change['id'] == change_id and change['status'] == 'pending':
+                change['status'] = 'approved'
+                change['approved_week'] = state.week
+
+                # Последствия одобрения
+                if change['risk_level'] in ['high', 'critical']:
+                    state.stability -= 5
+                    state.chat_history.append({"sender": "CAB", "text": f"⚠️ High-risk change approved for: {change['title']}. Monitor closely!"})
+                else:
+                    state.chat_history.append({"sender": "CAB", "text": f"✅ Change approved: {change['title']}"})
+
+                # Создаём задачу на внедрение изменения
+                impl_task = {
+                    "id": f"task-cab-{change['id']}",
+                    "title": f"Implement: {change['title']}",
+                    "type": WorkType.CHANGES,
+                    "points": 3 if change['risk_level'] == 'low' else 5,
+                    "duration": 2,
+                    "depends_on": [],
+                    "description": change['description']
+                }
+                state.tasks["backlog"].append(impl_task)
+                state.mentor_log.append({"sender": "Эрик", "text": "Изменение одобрено. Задача создана в backlog."})
+                return
+
+    def _handle_cab_reject(self, action):
+        """Отклонить изменение CAB."""
+        state = self.active_game_state
+        change_id = action.get('change_id')
+        reason = action.get('reason', 'No reason provided')
+
+        for change in state.pending_changes:
+            if change['id'] == change_id and change['status'] == 'pending':
+                change['status'] = 'rejected'
+                change['rejection_reason'] = reason
+                state.chat_history.append({"sender": "CAB", "text": f"❌ Change rejected: {change['title']}. Reason: {reason}"})
+                state.mentor_log.append({"sender": "Эрик", "text": "CAB отклонил изменение. Это предотвращает потенциальные проблемы."})
+                return
+
+    def _handle_cab_schedule_meeting(self, action):
+        """Запланировать CAB собрание."""
+        state = self.active_game_state
+        if not state.pending_changes:
+            state.chat_history.append({"sender": "System", "text": "No pending changes to review."})
+            return
+
+        state.cab_meeting_scheduled = True
+        state.chat_history.append({"sender": "System", "text": "📅 CAB Meeting scheduled!"})
+        state.mentor_log.append({"sender": "Эрик", "text": "CAB собрание. Рассмотрите все ожидающие изменения (RFC) и примите решение."})
 
 engine = SimulationEngine()

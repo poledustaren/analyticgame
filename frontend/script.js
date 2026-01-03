@@ -35,6 +35,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeSprintModal = document.getElementById('close-sprint-modal');
     const advanceSprintPhase = document.getElementById('advance-sprint-phase');
     const completeSprint = document.getElementById('complete-sprint');
+    // Standup Elements
+    const openStandupModal = document.getElementById('open-standup-modal');
+    const standupModal = document.getElementById('standup-modal');
+    const closeStandupModal = document.getElementById('close-standup-modal');
+    const submitStandup = document.getElementById('submit-standup');
+    // CAB Elements
+    const openCabModal = document.getElementById('open-cab-modal');
+    const cabModal = document.getElementById('cab-modal');
+    const closeCabModal = document.getElementById('close-cab-modal');
+    const submitCabChange = document.getElementById('submit-cab-change');
 
     // --- State Management ---
     let currentState = null;
@@ -50,6 +60,16 @@ document.addEventListener('DOMContentLoaded', () => {
         closeSprintModal.onclick = () => sprintModal.style.display = 'none';
         advanceSprintPhase.onclick = handleAdvanceSprintPhase;
         completeSprint.onclick = handleCompleteSprint;
+
+        // Standup Event Listeners
+        openStandupModal.onclick = openStandup;
+        closeStandupModal.onclick = () => standupModal.style.display = 'none';
+        submitStandup.onclick = completeStandup;
+
+        // CAB Event Listeners
+        openCabModal.onclick = openCab;
+        closeCabModal.onclick = () => cabModal.style.display = 'none';
+        submitCabChange.onclick = submitCABChange;
 
         tabBtns.forEach(btn => {
             btn.addEventListener('click', () => {
@@ -314,6 +334,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
+                // Check dependencies
+                const dependsOn = task.depends_on || [];
+                let blockedHtml = '';
+                let isBlocked = false;
+                if (dependsOn.length > 0) {
+                    // Check if all dependencies are done
+                    const allDepsDone = dependsOn.every(depId =>
+                        currentState.tasks.done?.some(t => t.id === depId)
+                    );
+                    if (!allDepsDone) {
+                        isBlocked = true;
+                        blockedHtml = `<div class="blocked-badge">🔗 BLOCKED by: ${dependsOn.join(', ')}</div>`;
+                    } else {
+                        blockedHtml = `<div class="unblocked-badge">✓ Dependencies met</div>`;
+                    }
+                }
+
                 card.innerHTML = `
                     <h4>${task.title}</h4>
                     <p style="font-size:11px; color:#ccc;">${task.description || ''}</p>
@@ -321,8 +358,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span>${task.points} pts</span>
                         ${resourceSlotHtml}
                     </div>
+                    ${blockedHtml}
                 `;
 
+                if (isBlocked) {
+                    card.classList.add('task-blocked');
+                }
                 if (isResourceNeeded && !assignedResId) {
                     card.classList.add('resource-drop-target');
                 }
@@ -433,6 +474,123 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // --- Daily Standup Functions ---
+
+    async function openStandup() {
+        const response = await fetch(`${API_BASE_URL}/standup`);
+        const data = await response.json();
+
+        document.getElementById('standup-week').textContent = currentState.week;
+
+        const teamContainer = document.getElementById('standup-team-container');
+        teamContainer.innerHTML = data.team.map(member => {
+            const answer = data.answers[member.id] || {};
+            return `
+                <div class="standup-member-card">
+                    <div class="standup-member-name">
+                        ${member.name}
+                        <span class="standup-member-role">${member.role}</span>
+                    </div>
+                    <div class="standup-inputs">
+                        <label>Yesterday:</label>
+                        <input type="text" id="standup-${member.id}-yesterday"
+                            value="${answer.yesterday || ''}" placeholder="What did you complete?">
+
+                        <label>Today:</label>
+                        <input type="text" id="standup-${member.id}-today"
+                            value="${answer.today || ''}" placeholder="What will you work on?">
+
+                        <label>Blockers:</label>
+                        <input type="text" id="standup-${member.id}-blockers"
+                            value="${answer.blockers || ''}" placeholder="Any blockers?">
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        standupModal.style.display = 'flex';
+    }
+
+    async function completeStandup() {
+        const team = currentState.team_members || [];
+
+        for (const member of team) {
+            const yesterday = document.getElementById(`standup-${member.id}-yesterday`).value;
+            const today = document.getElementById(`standup-${member.id}-today`).value;
+            const blockers = document.getElementById(`standup-${member.id}-blockers`).value;
+
+            await sendAction({
+                type: 'daily_standup_answer',
+                member_id: member.id,
+                yesterday,
+                today,
+                blockers
+            });
+        }
+
+        await sendAction({ type: 'daily_standup_complete' });
+        standupModal.style.display = 'none';
+    }
+
+    // --- CAB Functions ---
+
+    async function openCab() {
+        const response = await fetch(`${API_BASE_URL}/cab`);
+        const data = await response.json();
+
+        const pendingList = document.getElementById('cab-pending-list');
+        if (data.pending_changes.length === 0) {
+            pendingList.innerHTML = '<p style="color:var(--text-secondary);">No pending changes.</p>';
+        } else {
+            pendingList.innerHTML = data.pending_changes.map(change => `
+                <div class="cab-change-item risk-${change.risk_level}">
+                    <div class="cab-change-title">${change.title}</div>
+                    <span class="cab-change-risk">${change.risk_level.toUpperCase()}</span>
+                    <p style="font-size:12px; color:#ccc;">${change.description || ''}</p>
+                    <div class="cab-change-actions">
+                        <button class="cab-approve-btn" onclick="approveCABChange('${change.id}')">✓ Approve</button>
+                        <button class="cab-reject-btn" onclick="rejectCABChange('${change.id}')">✗ Reject</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        cabModal.style.display = 'flex';
+    }
+
+    async function submitCABChange() {
+        const title = document.getElementById('cab-title').value;
+        const description = document.getElementById('cab-description').value;
+        const riskLevel = document.getElementById('cab-risk').value;
+
+        await sendAction({
+            type: 'cab_submit_change',
+            title,
+            description,
+            risk_level: riskLevel
+        });
+
+        // Clear form
+        document.getElementById('cab-title').value = '';
+        document.getElementById('cab-description').value = '';
+
+        // Refresh list
+        openCab();
+    }
+
+    window.approveCABChange = async function(changeId) {
+        await sendAction({ type: 'cab_approve', change_id: changeId });
+        openCab();
+    };
+
+    window.rejectCABChange = async function(changeId) {
+        const reason = prompt('Rejection reason:');
+        if (reason) {
+            await sendAction({ type: 'cab_reject', change_id: changeId, reason });
+            openCab();
+        }
+    };
 
     init();
 });

@@ -152,6 +152,112 @@ def get_sprint_history():
     return jsonify(state.get('sprint_history', []))
 
 
+# --- Daily Standup API Endpoints ---
+
+@app.route('/api/standup', methods=['GET'])
+def get_standup_status():
+    """Возвращает статус ежедневного стендапа."""
+    state = engine.get_current_state()
+    if 'error' in state:
+        return jsonify(state), 400
+    return jsonify({
+        'completed': state.get('daily_standup_completed', False),
+        'team': state.get('team_members', []),
+        'answers': state.get('standup_answers', {})
+    })
+
+@app.route('/api/standup/answer', methods=['POST'])
+def submit_standup_answer():
+    """Записывает ответ участника стендапа."""
+    data = request.json
+    member_id = data.get('member_id')
+    if not member_id:
+        return jsonify({"error": "member_id is required"}), 400
+    action_data = {
+        'type': 'daily_standup_answer',
+        'member_id': member_id,
+        'yesterday': data.get('yesterday', ''),
+        'today': data.get('today', ''),
+        'blockers': data.get('blockers', '')
+    }
+    new_state = engine.process_action(action_data)
+    return jsonify(new_state)
+
+@app.route('/api/standup/complete', methods=['POST'])
+def complete_standup():
+    """Завершает ежедневный стендап."""
+    action_data = {'type': 'daily_standup_complete'}
+    new_state = engine.process_action(action_data)
+    return jsonify(new_state)
+
+@app.route('/api/day/advance', methods=['POST'])
+def advance_day():
+    """Переход к следующему дню."""
+    action_data = {'type': 'advance_day'}
+    new_state = engine.process_action(action_data)
+    return jsonify(new_state)
+
+
+# --- CAB API Endpoints ---
+
+@app.route('/api/cab', methods=['GET'])
+def get_cab_status():
+    """Возвращает статус CAB и ожидающие изменения."""
+    state = engine.get_current_state()
+    if 'error' in state:
+        return jsonify(state), 400
+    return jsonify({
+        'pending_changes': state.get('pending_changes', []),
+        'history': state.get('cab_history', []),
+        'meeting_scheduled': state.get('cab_meeting_scheduled', False)
+    })
+
+@app.route('/api/cab/submit', methods=['POST'])
+def submit_change_request():
+    """Создаёт новый запрос на изменение (RFC)."""
+    data = request.json
+    title = data.get('title')
+    if not title:
+        return jsonify({"error": "title is required"}), 400
+    action_data = {
+        'type': 'cab_submit_change',
+        'title': title,
+        'description': data.get('description', ''),
+        'risk_level': data.get('risk_level', 'medium')
+    }
+    new_state = engine.process_action(action_data)
+    return jsonify(new_state)
+
+@app.route('/api/cab/approve', methods=['POST'])
+def approve_change():
+    """Одобрить изменение CAB."""
+    data = request.json
+    change_id = data.get('change_id')
+    if not change_id:
+        return jsonify({"error": "change_id is required"}), 400
+    action_data = {'type': 'cab_approve', 'change_id': change_id}
+    new_state = engine.process_action(action_data)
+    return jsonify(new_state)
+
+@app.route('/api/cab/reject', methods=['POST'])
+def reject_change():
+    """Отклонить изменение CAB."""
+    data = request.json
+    change_id = data.get('change_id')
+    if not change_id:
+        return jsonify({"error": "change_id is required"}), 400
+    action_data = {'type': 'cab_reject', 'change_id': change_id, 'reason': data.get('reason', '')}
+    new_state = engine.process_action(action_data)
+    return jsonify(new_state)
+
+@app.route('/api/cab/meeting', methods=['POST'])
+def schedule_cab_meeting():
+    """Запланировать CAB собрание."""
+    action_data = {'type': 'cab_schedule_meeting'}
+    new_state = engine.process_action(action_data)
+    return jsonify(new_state)
+
+
 # --- Маршрут для обслуживания фронтенда ---
 
 @app.route('/')
