@@ -299,6 +299,58 @@ def get_standup_tip():
     return jsonify({'tip': tip, 'sender': 'Erik', 'role': 'mentor'})
 
 
+# --- Minigames API Endpoints ---
+
+@app.route('/api/minigame/start', methods=['POST'])
+def start_minigame():
+    """Запускает новую миниигру."""
+    data = request.json
+    game_type = data.get('game_type', 'brent_rescue')
+    difficulty = data.get('difficulty', 1)
+    action_data = {'type': 'minigame_start', 'game_type': game_type, 'difficulty': difficulty}
+    return jsonify(engine.process_action(action_data))
+
+@app.route('/api/minigame/action', methods=['POST'])
+def minigame_action():
+    """Выполняет действие в активной миниигре."""
+    data = request.json
+    action_data = {
+        'type': 'minigame_action',
+        'minigame_action': data.get('action_type'),
+        **{k: v for k, v in data.items() if k != 'action_type'}
+    }
+    return jsonify(engine.process_action(action_data))
+
+@app.route('/api/minigame/result', methods=['POST'])
+def submit_minigame_result():
+    """Завершает миниигру с результатом."""
+    data = request.json
+    action_data = {
+        'type': 'minigame_result',
+        'score': data.get('score', 0),
+        'completed': data.get('completed', False)
+    }
+    return jsonify(engine.process_action(action_data))
+
+@app.route('/api/minigame', methods=['GET'])
+def get_active_minigame():
+    """Возвращает активную миниигру."""
+    state = engine.get_current_state()
+    if 'error' in state:
+        return jsonify(state), 400
+    if hasattr(state, 'active_minigame') and state.active_minigame:
+        return jsonify(state.active_minigame.to_dict() if hasattr(state.active_minigame, 'to_dict') else state.active_minigame)
+    return jsonify({'error': 'No active minigame'}), 404
+
+@app.route('/api/minigames/completed', methods=['GET'])
+def get_completed_minigames():
+    """Возвращает список завершённых миниигр."""
+    state = engine.get_current_state()
+    if 'error' in state:
+        return jsonify(state), 400
+    return jsonify(state.get('completed_minigames', []))
+
+
 # --- Маршрут для обслуживания фронтенда ---
 
 @app.route('/')

@@ -569,6 +569,10 @@ class GameState:
         self.cab_history = []  # История решений CAB
         self.cab_meeting_scheduled = False
 
+        # Minigames System
+        self.active_minigame = None  # Текущая активная миниигра
+        self.completed_minigames = []  # Список завершённых миниигр
+
     def to_dict(self):
         """Сериализует состояние в словарь."""
         result = self.__dict__.copy()
@@ -578,6 +582,9 @@ class GameState:
         # Сериализуем историю спринтов
         if hasattr(self, 'sprint_history'):
             result['sprint_history'] = [s.to_dict() for s in self.sprint_history]
+        # Сериализуем активную миниигру
+        if hasattr(self, 'active_minigame') and self.active_minigame:
+            result['active_minigame'] = self.active_minigame.to_dict() if hasattr(self.active_minigame, 'to_dict') else self.active_minigame
         return result
 
     @classmethod
@@ -596,6 +603,222 @@ class GameState:
         # Обновляем остальные атрибуты
         instance.__dict__.update(data_copy)
         return instance
+
+
+# --- MINIGAMES SYSTEM ---
+
+class Minigame:
+    """Базовый класс для миниигр."""
+    def __init__(self, game_id, title, description, difficulty=1):
+        self.id = game_id
+        self.title = title
+        self.description = description
+        self.difficulty = difficulty  # 1-3
+        self.completed = False
+        self.best_score = None
+        self.attempts = 0
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'description': self.description,
+            'difficulty': self.difficulty,
+            'completed': self.completed,
+            'best_score': self.best_score,
+            'attempts': self.attempts
+        }
+
+
+class BrentRescueMinigame(Minigame):
+    """Миниигра 'Спасение Брента' - распределение знаний."""
+    def __init__(self):
+        super().__init__(
+            'brent_rescue',
+            'Спасение Брента',
+            'Помогите Бренту передать знания другим членам команды.',
+            difficulty=1
+        )
+        self.knowledge_areas = []  # Области знаний Брента
+        self.team_members = []     # Доступные члены команды для обучения
+        self.time_remaining = 60   # Секунды
+
+    def setup(self, difficulty=1):
+        """Настраивает миниигру в зависимости от сложности."""
+        self.knowledge_areas = [
+            {'id': 'auth', 'name': 'Система аутентификации', 'complexity': 2},
+            {'id': 'database', 'name': 'Схема базы данных', 'complexity': 3},
+            {'id': 'api', 'name': 'API интеграции', 'complexity': 2},
+            {'id': 'legacy', 'name': 'Legacy код', 'complexity': 4},
+        ]
+        self.team_members = [
+            {'id': 'dev1', 'name': 'Анна', 'skill': 3, 'busy': False},
+            {'id': 'dev2', 'name': 'Максим', 'skill': 2, 'busy': False},
+            {'id': 'dev3', 'name': 'Елена', 'skill': 2, 'busy': False},
+        ]
+        self.time_remaining = 90 - (difficulty * 15)
+        return self.to_dict()
+
+    def assign_knowledge(self, member_id, knowledge_id):
+        """Назначает область знаний члену команды."""
+        member = next((m for m in self.team_members if m['id'] == member_id), None)
+        knowledge = next((k for k in self.knowledge_areas if k['id'] == knowledge_id), None)
+
+        if not member or not knowledge or member['busy']:
+            return {'success': False, 'message': 'Невозможно назначить'}
+
+        member['busy'] = True
+        transfer_time = knowledge['complexity'] * 10 - member['skill'] * 2
+        transfer_time = max(10, transfer_time)
+
+        return {
+            'success': True,
+            'member': member['name'],
+            'knowledge': knowledge['name'],
+            'time': transfer_time
+        }
+
+
+class FlowOptimizationMinigame(Minigame):
+    """Миниигра 'Оптимизация потока' - визуализация потока."""
+    def __init__(self):
+        super().__init__(
+            'flow_optimization',
+            'Оптимизация потока',
+            'Настройте WIP-лимиты для оптимизации пропускной способности.',
+            difficulty=2
+        )
+        self.stages = ['backlog', 'in_progress', 'review', 'done']
+        self.wip_limits = {'in_progress': 3, 'review': 2}
+        self.current_flow = []
+        self.target_throughput = 5  # Задач в день
+
+    def setup(self, difficulty=1):
+        """Настраивает миниигру."""
+        base_tasks = 10 + difficulty * 5
+        self.current_flow = [
+            {'id': f't{i}', 'stage': 'backlog', 'value': random.randint(1, 3)}
+            for i in range(base_tasks)
+        ]
+        self.wip_limits = {
+            'in_progress': 2 + difficulty,
+            'review': 1 + difficulty
+        }
+        self.target_throughput = 3 + difficulty * 2
+        return self.to_dict()
+
+    def move_task(self, task_id, new_stage):
+        """Перемещает задачу в новую стадию."""
+        task = next((t for t in self.current_flow if t['id'] == task_id), None)
+        if not task:
+            return {'success': False}
+
+        # Проверяем WIP-лимит
+        if new_stage in self.wip_limits:
+            current_count = sum(1 for t in self.current_flow if t['stage'] == new_stage)
+            if current_count >= self.wip_limits[new_stage]:
+                return {'success': False, 'wip_exceeded': True}
+
+        task['stage'] = new_stage
+        return {'success': True, 'flow': self.get_flow_state()}
+
+    def get_flow_state(self):
+        """Возвращает текущее состояние потока."""
+        return {
+            'stages': {
+                stage: [t for t in self.current_flow if t['stage'] == stage]
+                for stage in self.stages
+            },
+            'wip_limits': self.wip_limits,
+            'throughput': len([t for t in self.current_flow if t['stage'] == 'done'])
+        }
+
+
+class FirefightingMinigame(Minigame):
+    """Миниигра 'Тушение пожаров' - приоритизация инцидентов."""
+    def __init__(self):
+        super().__init__(
+            'firefighting',
+            'Тушение пожаров',
+            'Быстро приоритизируйте и разрешите критические инциденты.',
+            difficulty=1
+        )
+        self.incidents = []
+        self.resources = []
+        self.time_remaining = 60
+
+    def setup(self, difficulty=1):
+        """Настраивает миниигру."""
+        incident_count = 5 + difficulty * 3
+        self.incidents = []
+        for i in range(incident_count):
+            urgency = random.randint(1, 5)
+            impact = random.randint(1, 5)
+            self.incidents.append({
+                'id': f'inc{i}',
+                'title': random.choice([
+                    'Сервер недоступен',
+                    'База данных перегружена',
+                    'Ошибка оплаты',
+                    'API не отвечает',
+                    'Ошибка безопасности',
+                    'Медленная загрузка'
+                ]),
+                'urgency': urgency,      # Срочность
+                'impact': impact,        # Влияние на бизнес
+                'complexity': random.randint(1, 4),
+                'status': 'open',        # open, in_progress, resolved
+                'time_to_resolve': 0
+            })
+
+        self.resources = [
+            {'id': 'r1', 'name': 'Dev 1', 'available': True},
+            {'id': 'r2', 'name': 'Dev 2', 'available': True},
+            {'id': 'brent', 'name': 'Brent', 'available': True}
+        ]
+        self.time_remaining = 90 - (difficulty * 10)
+        return self.to_dict()
+
+    def assign_resource(self, incident_id, resource_id):
+        """Назначает ресурс на инцидент."""
+        incident = next((i for i in self.incidents if i['id'] == incident_id), None)
+        resource = next((r for r in self.resources if r['id'] == resource_id), None)
+
+        if not incident or not resource or not resource['available']:
+            return {'success': False}
+
+        resource['available'] = False
+        incident['status'] = 'in_progress'
+
+        # Время решения зависит от сложности
+        resolve_time = incident['complexity'] * 10
+        if resource_id == 'brent':
+            resolve_time = resolve_time // 2  # Brent быстрее
+
+        return {'success': True, 'resolve_time': resolve_time}
+
+    def resolve_incident(self, incident_id, time_spent):
+        """Помечает инцидент как решённый."""
+        incident = next((i for i in self.incidents if i['id'] == incident_id), None)
+        if incident and incident['status'] == 'in_progress':
+            incident['status'] = 'resolved'
+            # Освобождаем ресурс
+            for r in self.resources:
+                if not r['available']:
+                    r['available'] = True
+                    break
+            return {'success': True, 'points': incident['urgency'] * incident['impact']}
+        return {'success': False}
+
+    def get_priority_order(self):
+        """Возвращает рекомендуемый порядок приоритизации."""
+        return sorted(
+            [i for i in self.incidents if i['status'] == 'open'],
+            key=lambda x: -(x['urgency'] * x['impact'])
+        )
+
+
+# --- LLM SYSTEM ---
 
 class MockLLM:
     """Имитирует ответы ИИ-персонажей с контекстной реакцией на состояние игры."""
@@ -814,6 +1037,8 @@ class SimulationEngine:
         elif action_type == 'task_move': self._handle_task_move(action)
         elif action_type == 'set_wip_limit': self._handle_set_wip_limit(action)
         elif action_type == 'minigame_result': self._handle_minigame_result(action)
+        elif action_type == 'minigame_start': self._handle_minigame_start(action)
+        elif action_type == 'minigame_action': return self._handle_minigame_action(action)
         elif action_type == 'assign_resource': self._handle_assign_resource(action)
         # Sprint actions
         elif action_type == 'sprint_set_capacity': self._handle_sprint_set_capacity(action)
@@ -1049,8 +1274,107 @@ class SimulationEngine:
         limit = action.get('limit')
         if isinstance(limit, int) and limit > 0: self.active_game_state.wip_limit = limit
 
+    # --- Minigame Action Handlers ---
+
+    def _handle_minigame_start(self, action):
+        """Запускает миниигру."""
+        state = self.active_game_state
+        game_type = action.get('game_type', 'brent_rescue')
+        difficulty = action.get('difficulty', 1)
+
+        if game_type == 'brent_rescue':
+            game = BrentRescueMinigame()
+        elif game_type == 'flow_optimization':
+            game = FlowOptimizationMinigame()
+        elif game_type == 'firefighting':
+            game = FirefightingMinigame()
+        else:
+            return {'error': 'Unknown minigame type'}
+
+        game.setup(difficulty)
+        state.active_minigame = game
+        state.chat_history.append({
+            "sender": "System",
+            "text": f"🎮 Миниигра '{game.title}' началась!"
+        })
+        return game.to_dict()
+
+    def _handle_minigame_action(self, action):
+        """Обрабатывает действие в миниигре."""
+        state = self.active_game_state
+        if not state.active_minigame:
+            return {'error': 'No active minigame'}
+
+        game = state.active_minigame
+        action_type = action.get('minigame_action')
+
+        if action_type == 'assign_knowledge' and isinstance(game, BrentRescueMinigame):
+            return game.assign_knowledge(action.get('member_id'), action.get('knowledge_id'))
+
+        elif action_type == 'move_task' and isinstance(game, FlowOptimizationMinigame):
+            return game.move_task(action.get('task_id'), action.get('new_stage'))
+
+        elif action_type == 'assign_incident' and isinstance(game, FirefightingMinigame):
+            return game.assign_resource(action.get('incident_id'), action.get('resource_id'))
+
+        elif action_type == 'resolve_incident' and isinstance(game, FirefightingMinigame):
+            return game.resolve_incident(action.get('incident_id'), action.get('time_spent'))
+
+        return {'error': 'Unknown minigame action'}
+
     def _handle_minigame_result(self, action):
-        pass
+        """Завершает миниигру с результатом."""
+        state = self.active_game_state
+        if not state.active_minigame:
+            return {'error': 'No active minigame'}
+
+        game = state.active_minigame
+        score = action.get('score', 0)
+        completed = action.get('completed', False)
+
+        game.attempts += 1
+        if completed:
+            game.completed = True
+            if game.best_score is None or score > game.best_score:
+                game.best_score = score
+
+            # Добавляем в список завершённых
+            if not hasattr(state, 'completed_minigames'):
+                state.completed_minigames = []
+            state.completed_minigames.append({
+                'id': game.id,
+                'title': game.title,
+                'score': score,
+                'week': state.week
+            })
+
+            # Бонусы за прохождение
+            state.morale = min(100, state.morale + 5)
+            state.chat_history.append({
+                "sender": "System",
+                "text": f"🏆 Миниигра '{game.title}' пройдена! Очки: {score}"
+            })
+            state.mentor_log.append({
+                "sender": "Эрик",
+                "text": self._get_minigame_completion_tip(game.id)
+            })
+        else:
+            state.chat_history.append({
+                "sender": "System",
+                "text": f"Миниигра '{game.title}' не пройдена. Попробуйте ещё раз!"
+            })
+
+        state.active_minigame = None
+        return {'success': True, 'completed': completed, 'score': score}
+
+    def _get_minigame_completion_tip(self, game_id):
+        """Возвращает совет ментора после прохождения миниигры."""
+        tips = {
+            'brent_rescue': "Теперь знания распределены. Брент больше не узкое место. Команда может работать автономно.",
+            'flow_optimization': "Вы увидели, как WIP-лимиты влияют на поток. Меньше параллельной работы = быстрее результаты.",
+            'firefighting': "Приоритизация - ключ к управлению инцидентами. Не всё срочно одинаково."
+        }
+        return tips.get(game_id, "Отличная практика. Применяйте эти уроки в основной игре.")
 
     # --- Sprint Action Handlers ---
 
