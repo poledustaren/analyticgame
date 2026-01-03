@@ -11,7 +11,7 @@
 
     <div id="app-layout">
 
-        <!-- LEFT SIDEBAR: Resources & Game Info -->
+        <!-- LEFT SIDEBAR: Resources, Sprint & Game Info -->
         <aside id="sidebar">
             <div class="brand">
                 <h1>PHOENIX<br><span>SIMULATOR</span></h1>
@@ -20,6 +20,69 @@
             <div class="sidebar-section">
                 <h3>LEVEL <span id="level-display">1</span></h3>
                 <p class="level-title">The Stabilizer</p>
+            </div>
+
+            <!-- SPRINT PANEL -->
+            <div class="sidebar-section sprint-section">
+                <h3>SPRINT <span id="sprint-number">1</span></h3>
+                <div class="sprint-phase" id="sprint-phase-display">
+                    <span class="phase-indicator" id="phase-planning">PLANNING</span>
+                    <span class="phase-arrow">→</span>
+                    <span class="phase-indicator" id="phase-active">ACTIVE</span>
+                    <span class="phase-arrow">→</span>
+                    <span class="phase-indicator" id="phase-review">REVIEW</span>
+                    <span class="phase-arrow">→</span>
+                    <span class="phase-indicator" id="phase-retro">RETRO</span>
+                </div>
+
+                <!-- Capacity Display (Planning phase) -->
+                <div id="sprint-capacity-panel" class="sprint-panel">
+                    <label>Capacity (points):</label>
+                    <div class="capacity-input">
+                        <input type="number" id="capacity-input" value="10" min="1" max="50">
+                        <button id="set-capacity-btn" class="small-btn">SET</button>
+                    </div>
+                </div>
+
+                <!-- Sprint Goals (Planning phase) -->
+                <div id="sprint-goals-panel" class="sprint-panel">
+                    <label>Sprint Goals:</label>
+                    <div id="sprint-goals-list" class="sprint-list"></div>
+                    <div class="goal-input">
+                        <input type="text" id="goal-input" placeholder="Add goal...">
+                        <button id="add-goal-btn" class="small-btn">+</button>
+                    </div>
+                </div>
+
+                <!-- Sprint Backlog (Planning/Active phases) -->
+                <div id="sprint-backlog-panel" class="sprint-panel">
+                    <label>Sprint Backlog: <span id="sprint-points">0</span>/<span id="sprint-capacity">10</span> pts</label>
+                    <div id="sprint-tasks-list" class="sprint-tasks-list"></div>
+                </div>
+
+                <!-- Velocity Display (Active/Review phases) -->
+                <div id="sprint-velocity-panel" class="sprint-panel" style="display:none;">
+                    <label>Velocity: <span id="sprint-velocity">0</span> pts</label>
+                    <div class="velocity-bar">
+                        <div id="velocity-progress" class="velocity-progress" style="width: 0%;"></div>
+                    </div>
+                </div>
+
+                <!-- Retro Panel (Retro phase) -->
+                <div id="sprint-retro-panel" class="sprint-panel" style="display:none;">
+                    <label>Retro Actions:</label>
+                    <div id="retro-actions-list" class="sprint-list"></div>
+                    <div class="retro-input">
+                        <input type="text" id="retro-input" placeholder="Action item...">
+                        <button id="add-retro-btn" class="small-btn">+</button>
+                    </div>
+                </div>
+
+                <!-- Phase Controls -->
+                <div class="sprint-controls">
+                    <button id="advance-phase-btn" class="phase-btn">START SPRINT →</button>
+                    <button id="complete-sprint-btn" class="phase-btn complete-btn" style="display:none;">COMPLETE SPRINT</button>
+                </div>
             </div>
 
             <div class="sidebar-section">

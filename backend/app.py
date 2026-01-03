@@ -52,6 +52,106 @@ def handle_action():
     return jsonify(new_state)
 
 
+# --- Sprint API Endpoints ---
+
+@app.route('/api/sprint', methods=['GET'])
+def get_sprint():
+    """Возвращает текущий спринт."""
+    state = engine.get_current_state()
+    if 'error' in state:
+        return jsonify(state), 400
+    return jsonify(state.get('current_sprint'))
+
+@app.route('/api/sprint/advance', methods=['POST'])
+def advance_sprint_phase():
+    """Переход к следующей фазе спринта."""
+    action_data = {'type': 'sprint_advance_phase'}
+    new_state = engine.process_action(action_data)
+    return jsonify(new_state)
+
+@app.route('/api/sprint/capacity', methods=['POST'])
+def set_sprint_capacity():
+    """Устанавливает ёмкость спринта."""
+    data = request.json
+    capacity = data.get('capacity')
+    if capacity is None:
+        return jsonify({"error": "capacity is required"}), 400
+    action_data = {'type': 'sprint_set_capacity', 'capacity': capacity}
+    new_state = engine.process_action(action_data)
+    return jsonify(new_state)
+
+@app.route('/api/sprint/goal', methods=['POST'])
+def add_sprint_goal():
+    """Добавляет цель спринта."""
+    data = request.json
+    goal = data.get('goal')
+    if not goal:
+        return jsonify({"error": "goal is required"}), 400
+    action_data = {'type': 'sprint_add_goal', 'goal': goal}
+    new_state = engine.process_action(action_data)
+    return jsonify(new_state)
+
+@app.route('/api/sprint/task', methods=['POST'])
+def add_sprint_task():
+    """Добавляет задачу в бэклог спринта."""
+    data = request.json
+    task_id = data.get('task_id')
+    if not task_id:
+        return jsonify({"error": "task_id is required"}), 400
+    action_data = {'type': 'sprint_add_task', 'task_id': task_id}
+    new_state = engine.process_action(action_data)
+    return jsonify(new_state)
+
+@app.route('/api/sprint/task', methods=['DELETE'])
+def remove_sprint_task():
+    """Удаляет задачу из бэклога спринта."""
+    data = request.json
+    task_id = data.get('task_id')
+    if not task_id:
+        return jsonify({"error": "task_id is required"}), 400
+    action_data = {'type': 'sprint_remove_task', 'task_id': task_id}
+    new_state = engine.process_action(action_data)
+    return jsonify(new_state)
+
+@app.route('/api/sprint/note', methods=['POST'])
+def add_sprint_note():
+    """Добавляет заметку к фазе спринта."""
+    data = request.json
+    phase = data.get('phase')
+    note = data.get('note')
+    if not phase or note is None:
+        return jsonify({"error": "phase and note are required"}), 400
+    action_data = {'type': 'sprint_add_note', 'phase': phase, 'note': note}
+    new_state = engine.process_action(action_data)
+    return jsonify(new_state)
+
+@app.route('/api/sprint/retro-action', methods=['POST'])
+def add_retro_action():
+    """Добавляет действие из ретроспективы."""
+    data = request.json
+    action_text = data.get('action')
+    if not action_text:
+        return jsonify({"error": "action is required"}), 400
+    action_data = {'type': 'sprint_add_retro_action', 'action': action_text}
+    new_state = engine.process_action(action_data)
+    return jsonify(new_state)
+
+@app.route('/api/sprint/complete', methods=['POST'])
+def complete_sprint():
+    """Завершает спринт и начинает новый."""
+    action_data = {'type': 'sprint_complete'}
+    new_state = engine.process_action(action_data)
+    return jsonify(new_state)
+
+@app.route('/api/sprint/history', methods=['GET'])
+def get_sprint_history():
+    """Возвращает историю спринтов."""
+    state = engine.get_current_state()
+    if 'error' in state:
+        return jsonify(state), 400
+    return jsonify(state.get('sprint_history', []))
+
+
 # --- Маршрут для обслуживания фронтенда ---
 
 @app.route('/')
