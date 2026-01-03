@@ -6,6 +6,417 @@ from datetime import datetime, timedelta
 
 SAVES_DIR = os.path.join(os.path.dirname(__file__), 'saves')
 
+class Event:
+    """Игровое событие с выборами и последствиями."""
+    def __init__(self, event_id, title, description, week, choices=None):
+        self.id = event_id
+        self.title = title
+        self.description = description
+        self.week = week
+        self.choices = choices or []
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'description': self.description,
+            'week': self.week,
+            'choices': self.choices
+        }
+
+    @classmethod
+    def from_template(cls, template, week):
+        return cls(
+            template['id'],
+            template['title'],
+            template['description'],
+            week,
+            template.get('choices', [])
+        )
+
+# --- EVENT TEMPLATES ---
+# Все возможные события в игре
+
+ALL_EVENTS = [
+    {
+        'id': 'prod_bug',
+        'title': '🐛 Production Bug Found',
+        'description': 'Critical bug discovered in production. Customers are complaining!',
+        'weight': 3,
+        'min_level': 1,
+        'max_level': 4,
+        'choices': [
+            {
+                'id': 'fix_now',
+                'label': 'Drop everything and fix it now',
+                'effects': [
+                    {'type': 'stability', 'value': 10},
+                    {'type': 'add_task', 'task': {
+                        'title': 'Hotfix: Production Bug',
+                        'type': WorkType.UNPLANNED,
+                        'points': 5,
+                        'duration': 2,
+                        'required_resource': 'brent',
+                        'description': 'Critical bug - customers affected'
+                    }}
+                ],
+                'result_message': 'You prioritized the bug. Stability improved!',
+                'mentor_comment': 'Правильно. Производство важнее.'
+            },
+            {
+                'id': 'queue_it',
+                'label': 'Add to backlog, finish current work',
+                'effects': [
+                    {'type': 'stability', 'value': -10},
+                    {'type': 'add_task', 'task': {
+                        'title': 'Fix: Production Bug',
+                        'type': WorkType.UNPLANNED,
+                        'points': 5,
+                        'duration': 2,
+                        'description': 'Bug from production'
+                    }}
+                ],
+                'result_message': 'Customers are angry. Stability dropped.',
+                'mentor_comment': 'Иногда приходится жертвовать. Но клиенты недовольны.'
+            }
+        ]
+    },
+    {
+        'id': 'security_incident',
+        'title': '🔒 Security Incident',
+        'description': 'CISO reports a potential security breach. Immediate action required.',
+        'weight': 2,
+        'min_level': 1,
+        'max_level': 4,
+        'choices': [
+            {
+                'id': 'investigate',
+                'label': 'Full investigation (takes time)',
+                'effects': [
+                    {'type': 'add_task', 'task': {
+                        'title': 'Security Investigation',
+                        'type': WorkType.INTERNAL,
+                        'points': 8,
+                        'duration': 3,
+                        'required_resource': 'brent',
+                        'description': 'Full security audit'
+                    }}
+                ],
+                'result_message': 'Investigation started. Brent is occupied.',
+                'mentor_comment': 'Безопасность важна. Но Брент снова перегружен.'
+            },
+            {
+                'id': 'quick_patch',
+                'label': 'Quick patch and move on',
+                'effects': [
+                    {'type': 'stability', 'value': -5},
+                    {'type': 'budget', 'value': 500}
+                ],
+                'result_message': 'Patch applied. Potential risk remains.',
+                'mentor_comment': 'Быстрое решение не всегда лучшее.'
+            }
+        ]
+    },
+    {
+        'id': 'feature_request',
+        'title': '💡 CEO Feature Request',
+        'description': 'CEO wants a "simple" feature added by next week.',
+        'weight': 2,
+        'min_level': 1,
+        'max_level': 4,
+        'choices': [
+            {
+                'id': 'accept',
+                'label': 'Accept and add to backlog',
+                'effects': [
+                    {'type': 'morale', 'value': -5},
+                    {'type': 'add_task', 'task': {
+                        'title': "CEO's 'Simple' Feature",
+                        'type': WorkType.BUSINESS,
+                        'points': 13,
+                        'duration': 5,
+                        'description': 'Important feature from CEO'
+                    }}
+                ],
+                'result_message': 'Team is not happy about more work.',
+                'mentor_comment': 'Бюрократия. Иногда просто надо сказать "нет".'
+            },
+            {
+                'id': 'push_back',
+                'label': 'Push back to next quarter',
+                'effects': [
+                    {'type': 'morale', 'value': 5}
+                ],
+                'result_message': 'CEO is disappointed but team is relieved.',
+                'mentor_comment': 'Хорошая защита команды. Не стесняйтесь защищать границы.'
+            }
+        ]
+    },
+    {
+        'id': 'team_sick',
+        'title': '🤒 Team Member Sick',
+        'description': 'Alex is out sick for the week.',
+        'weight': 2,
+        'min_level': 1,
+        'max_level': 4,
+        'choices': [
+            {
+                'id': 'redistribute',
+                'label': 'Redistribute work to others',
+                'effects': [
+                    {'type': 'morale', 'value': -5},
+                    {'type': 'unplanned_work', 'value': 5}
+                ],
+                'result_message': 'Team is overworked. Morale suffers.',
+                'mentor_comment': 'Перераспределение работы увеличивает нагрузку.'
+            },
+            {
+                'id': 'delay',
+                'label': 'Delay less critical tasks',
+                'effects': [
+                    {'type': 'wip_limit', 'value': -1}
+                ],
+                'result_message': 'WIP limit reduced. Focus on critical work.',
+                'mentor_comment': 'Ограничение работы в разумном месте.'
+            }
+        ]
+    },
+    {
+        'id': 'vendor_issue',
+        'title': '📦 Vendor Delays',
+        'description': 'Key vendor is delayed on critical component.',
+        'weight': 1,
+        'min_level': 2,
+        'max_level': 4,
+        'choices': [
+            {
+                'id': 'wait',
+                'label': 'Wait for vendor',
+                'effects': [
+                    {'type': 'budget', 'value': -500}
+                ],
+                'result_message': 'Project delayed. Money wasted.',
+                'mentor_comment': 'Зависимость от внешних поставщиков — риск.'
+            },
+            {
+                'id': 'alternative',
+                'label': 'Find alternative solution',
+                'effects': [
+                    {'type': 'add_task', 'task': {
+                        'title': 'Build Alternative Component',
+                        'type': WorkType.INTERNAL,
+                        'points': 5,
+                        'duration': 3,
+                        'description': 'In-house solution instead of vendor'
+                    }}
+                ],
+                'result_message': 'Team builds alternative. More control.',
+                'mentor_comment': 'Самостоятельность дает больше контроля.'
+            }
+        ]
+    },
+    {
+        'id': 'budget_cut',
+        'title': '💰 Budget Cut',
+        'description': 'Finance department requires 10% budget cut.',
+        'weight': 1,
+        'min_level': 2,
+        'max_level': 4,
+        'choices': [
+            {
+                'id': 'cut_training',
+                'label': 'Cut training budget',
+                'effects': [
+                    {'type': 'budget', 'value': -5000},
+                    {'type': 'morale', 'value': -10}
+                ],
+                'result_message': 'Training cancelled. Team demoralized.',
+                'mentor_comment': 'Обучение — инвестиция в будущее.'
+            },
+            {
+                'id': 'cut_tools',
+                'label': 'Cut tools budget',
+                'effects': [
+                    {'type': 'budget', 'value': -5000},
+                    {'type': 'unplanned_work', 'value': 10}
+                ],
+                'result_message': 'Tool licenses cancelled. More manual work.',
+                'mentor_comment': 'Хорошие инструменты окупаются. Без них — больше рутины.'
+            }
+        ]
+    },
+    {
+        'id': 'audit_findings',
+        'title': '📋 Audit Findings',
+        'description': 'External audit found compliance issues.',
+        'weight': 1,
+        'min_level': 2,
+        'max_level': 4,
+        'choices': [
+            {
+                'id': 'quick_fix',
+                'label': 'Quick fix for audit',
+                'effects': [
+                    {'type': 'stability', 'value': -5},
+                    {'type': 'add_task', 'task': {
+                        'title': 'Audit Quick Fix',
+                        'type': WorkType.CHANGES,
+                        'points': 3,
+                        'duration': 1,
+                        'description': 'Minimum to pass audit'
+                    }}
+                ],
+                'result_message': 'Audit passed. Technical debt increased.',
+                'mentor_comment': 'Быстрое решение создает долг.'
+            },
+            {
+                'id': 'proper_fix',
+                'label': 'Proper remediation',
+                'effects': [
+                    {'type': 'add_task', 'task': {
+                        'title': 'Compliance Remediation',
+                        'type': WorkType.CHANGES,
+                        'points': 8,
+                        'duration': 3,
+                        'description': 'Full compliance fix'
+                    }}
+                ],
+                'result_message': 'Proper fix. Takes longer but more stable.',
+                'mentor_comment': 'Делайте правильно с первого раза.'
+            }
+        ]
+    },
+    {
+        'id': 'competitor_release',
+        'title': '🚀 Competitor Release',
+        'description': 'Competitor just released a similar feature!',
+        'weight': 2,
+        'min_level': 1,
+        'max_level': 4,
+        'choices': [
+            {
+                'id': 'rush',
+                'label': 'Rush to release faster',
+                'effects': [
+                    {'type': 'stability', 'value': -10},
+                    {'type': 'budget', 'value': -1000}
+                ],
+                'result_message': 'Rushed release has bugs. Stability suffered.',
+                'mentor_comment': 'Спешка часто приводит к ошибкам.'
+            },
+            {
+                'id': 'focus_quality',
+                'label': 'Focus on quality, ignore competitor',
+                'effects': [
+                    {'type': 'morale', 'value': 5}
+                ],
+                'result_message': 'Team focused on quality. Long-term thinking.',
+                'mentor_comment': 'Не гонитесь за конкурентами. Качество важнее скорости.'
+            }
+        ]
+    },
+    {
+        'id': 'happy_customer',
+        'title': '⭐ Happy Customer',
+        'description': 'A key customer sent praise and a referral!',
+        'weight': 1,
+        'min_level': 1,
+        'max_level': 4,
+        'choices': [
+            {
+                'id': 'celebrate',
+                'label': 'Celebrate with team',
+                'effects': [
+                    {'type': 'morale', 'value': 10},
+                    {'type': 'budget', 'value': 2000}
+                ],
+                'result_message': 'Team celebration! Morale boosted!',
+                'mentor_comment': 'Признание мотивирует. Продолжайте в том же духе!'
+            },
+            {
+                'id': 'stay_focused',
+                'label': 'Stay focused on work',
+                'effects': [
+                    {'type': 'wip_limit', 'value': 1}
+                ],
+                'result_message': 'Humble approach. WIP limit increased.',
+                'mentor_comment': 'Скромность хороша. Но не забывайте отмечать победы.'
+            }
+        ]
+    },
+    {
+        'id': 'technical_debt',
+        'title': '🏗️ Technical Debt',
+        'description': 'The codebase has accumulated significant technical debt.',
+        'weight': 2,
+        'min_level': 2,
+        'max_level': 4,
+        'condition': lambda s: s.week > 3,
+        'choices': [
+            {
+                'id': 'pay_debt',
+                'label': 'Sprint focused on refactoring',
+                'effects': [
+                    {'type': 'add_task', 'task': {
+                        'title': 'Refactoring: Technical Debt',
+                        'type': WorkType.INTERNAL,
+                        'points': 8,
+                        'duration': 2,
+                        'description': 'Pay down technical debt'
+                    }}
+                ],
+                'result_message': 'Refactoring improves long-term health.',
+                'mentor_comment': 'Плата долг — инвестиция в будущее.'
+            },
+            {
+                'id': 'ignore',
+                'label': 'Ignore and continue feature work',
+                'effects': [
+                    {'type': 'stability', 'value': -5},
+                    {'type': 'unplanned_work', 'value': 10}
+                ],
+                'result_message': 'Debt accumulates. Problems will compound.',
+                'mentor_comment': 'Игнорирование долгов делает их только больше.'
+            }
+        ]
+    },
+    {
+        'id': 'coffee_talk',
+        'title': '☕ Coffee Talk',
+        'description': 'A team member has an idea for improving workflow.',
+        'weight': 1,
+        'min_level': 1,
+        'max_level': 4,
+        'choices': [
+            {
+                'id': 'listen',
+                'label': 'Listen and implement',
+                'effects': [
+                    {'type': 'morale', 'value': 5},
+                    {'type': 'add_task', 'task': {
+                        'title': 'Process Improvement',
+                        'type': WorkType.INTERNAL,
+                        'points': 3,
+                        'duration': 1,
+                        'description': 'Team-suggested improvement'
+                    }}
+                ],
+                'result_message': 'Team feels heard. Small improvement made.',
+                'mentor_comment': 'Идеи от команды часто самые ценные.'
+            },
+            {
+                'id': 'politely_decline',
+                'label': 'Politely decline for now',
+                'effects': [
+                    {'type': 'morale', 'value': -2}
+                ],
+                'result_message': 'Idea noted but not acted on.',
+                'mentor_comment': 'Баланс между открытостью и фокусом.'
+            }
+        ]
+    }
+]
+
 class SprintPhase:
     PLANNING = "planning"
     ACTIVE = "active"
@@ -187,20 +598,168 @@ class GameState:
         return instance
 
 class MockLLM:
-    """Имитирует ответы ИИ-персонажей."""
+    """Имитирует ответы ИИ-персонажей с контекстной реакцией на состояние игры."""
     def __init__(self):
-        self.responses = {
-            "developer": ["Хм, задача выглядит сложнее.", "Понял, приступаю.", "Нужен четкий API-контракт."],
+        # Базовые ответы по ролям
+        self.base_responses = {
+            "developer": ["Понял, приступаю.", "Нужен четкий API-контракт.", "Эта задача сложнее, чем казалось."],
             "developer_wip_error": ["Наш WIP-лимит превышен! Сначала завершите текущие задачи."],
             "manager": ["Команда, ускоряемся.", "Отличный шаг.", "Бюджет не резиновый."],
             "stakeholder": ["Я хочу видеть прогресс.", "Нам нужна эта фича как можно скорее."],
             "ciso": ["Безопасность прежде всего!"],
-            "cfo": ["Почините зарплатную ведомость!"],
-            "marketing": ["Наш сайт лежит!"],
-            "erik": ["Сколько типов работы вы делаете?", "Вы постоянно тушите пожары.", "Если вы не управляете незапланированной работой, она управляет вами.", "Что замедляет ваш поток?", "У каждой системы есть ограничение."]
+            "cfo": ["Почините зарплатную ведомость!", "Финансовый отчет снова не работает!"],
+            "marketing": ["Наш сайт лежит!", "Нужно срочно выкатить обновление!"],
+            "erik": []  # Заполняется динамически
         }
-    def get_response(self, role, chat_history=None):
-        return random.choice(self.responses.get(role, ["..."]))
+
+        # Ответы Эрика по контексту
+        self.erik_responses = {
+            "high_unplanned": [
+                "Вы постоянно тушите пожары вместо того, чтобы устранить причины.",
+                "Незапланированная работа поглощает ваш поток. Нужно найти корневую причину.",
+                "Сколько процентов вашего времени уходит на незапланированную работу?",
+                "Ваша система нестабильна, потому что вы не управляете вариативностью."
+            ],
+            "low_stability": [
+                "Стабильность системы критически низка. Нужно замедлиться и качественно починить фундамент.",
+                "Вы не можете построить надежную систему на шатком фундаменте.",
+                "Каждое изменение ломает что-то другое. Это признак техдолга.",
+                "Нужно сначала остановить кровотечение, потом ускоряться."
+            ],
+            "wip_exceeded": [
+                "Ваш WIP-лимит превышен! Это замедляет ваш поток.",
+                "Начинайте меньше задач, заканчивайте больше.",
+                "Multitasking - это миф. Фокусируйтесь на завершении."
+            ],
+            "good_velocity": [
+                "Отличный прогресс! Вы начинаете понимать поток.",
+                "Так держать! Снижение WIP повышает пропускную способность.",
+                "Вы видите? Когда вы фокусируетесь, результаты растут."
+            ],
+            "sprint_planning": [
+                "План должен быть реалистичным. Переоценка хуже, чем недооценка.",
+                "Не забудьте оставить буфер для незапланированной работы.",
+                "Вместите ли вы всё в свою ёмкость?"
+            ],
+            "sprint_review": [
+                "Давайте посмотрим правде в глаза: вы планировали столько, сколько действительно смогли сделать?",
+                "Ваша разница между планом и фактом показывает вашу реальную ёмкость.",
+                "Используйте эти данные для следующего спринта."
+            ],
+            "sprint_retro": [
+                "Что помешало вам выполнить план?",
+                "Какие процессы замедляют вас?",
+                "Где теряется ценность в вашем потоке?"
+            ],
+            "brent_blocked": [
+                "Brent - единственный специалист, который знает эту систему. Это узкое место.",
+                "Вам нужно разбросать знания, иначе Brent всегда будет буфером.",
+                "Каждый раз, когда вы ждёте Brent, вы теряете возможность учиться."
+            ],
+            "task_blocked": [
+                "Заблокированная задача не создает ценности. Разблокируйте или верните в бэклог.",
+                "Зависимости должны быть видны заранее. Вы управляете ими или они вами?"
+            ],
+            "cab_needed": [
+                "Это изменение требует оценки рисков. CAB поможет избежать катастрофы.",
+                "Вы продумали последствия этого изменения?",
+                "Изменения в производстве всегда несут риск. Управляйте ими осознанно."
+            ],
+            "general": [
+                "Сколько типов работы вы делаете?",
+                "Что замедляет ваш поток прямо сейчас?",
+                "У каждой системы есть ограничение. Найдите своё.",
+                "Если вы не управляете незапланированной работой, она управляет вами.",
+                "Где теряется время в вашем процессе?",
+                "Какой один шаг вы могли бы сделать для улучшения потока?"
+            ]
+        }
+
+        # Ответы для событий
+        self.event_responses = {
+            "security_incident": "Это не просто инцидент - это сигнал. Уязвимость существовала, её просто не искали.",
+            "production_outage": "Каждый минут простоя - это сигнал о проблемах в процессе. Что вы узнали?",
+            "key_person_absent": "Это показывает ваше узкое место. Знания должны быть распределены.",
+            "requirement_change": "Изменения неизбежны. Вопрос в том, насколько быстро вы на них реагируете.",
+            "tech_debt_revealed": "Техдолг - это кредит. Вы платите проценты каждый день.",
+            "unexpected_complexity": "Сложность всегда была там. Вы просто её не видели.",
+            "vendor_issue": "Внешние зависимости всегда риск. Какой ваш план Б?",
+            "team_conflict": "Конфликт в команде - симптом проблемы в процессе, а не просто личные трения."
+        }
+
+    def get_response(self, role, chat_history=None, game_state=None):
+        """Генерирует контекстный ответ на основе состояния игры."""
+        if role == "erik" and game_state:
+            return self._get_erik_contextual_response(game_state)
+
+        base = self.base_responses.get(role, ["..."])
+        return random.choice(base)
+
+    def _get_erik_contextual_response(self, state):
+        """Генерирует контекстный ответ Эрика на основе состояния игры."""
+        candidates = []
+
+        # Проверяем критические состояния
+        if state.get('unplanned_percentage', 0) > 40:
+            candidates.extend(self.erik_responses["high_unplanned"])
+
+        if state.get('stability', 100) < 50:
+            candidates.extend(self.erik_responses["low_stability"])
+
+        # Проверяем WIP
+        in_progress = [t for t in state.get('tasks', []) if t.get('status') == 'in_progress']
+        wip_limit = state.get('wip_limit', 3)
+        if len(in_progress) > wip_limit:
+            candidates.extend(self.erik_responses["wip_exceeded"])
+
+        # Проверяем заблокированные задачи
+        blocked_tasks = [t for t in state.get('tasks', []) if t.get('blocked')]
+        if blocked_tasks:
+            candidates.extend(self.erik_responses["task_blocked"])
+
+        # Проверяем спринт фазу
+        if state.get('sprint'):
+            sprint = state['sprint']
+            phase = sprint.get('phase', 'planning')
+            if phase == 'planning':
+                candidates.extend(self.erik_responses["sprint_planning"])
+            elif phase == 'review':
+                candidates.extend(self.erik_responses["sprint_review"])
+            elif phase == 'retro':
+                candidates.extend(self.erik_responses["sprint_retro"])
+
+        # Проверяем хороший прогресс
+        if state.get('stability', 100) > 80 and state.get('unplanned_percentage', 0) < 20:
+            candidates.extend(self.erik_responses["good_velocity"])
+
+        # Если есть контекстные кандидаты, возвращаем один из них
+        if candidates:
+            return random.choice(candidates)
+
+        # Иначе базовый ответ
+        return random.choice(self.erik_responses["general"])
+
+    def get_event_comment(self, event_type):
+        """Возвращает комментарий Эрика для конкретного типа события."""
+        return self.event_responses.get(event_type, "Что вы можете извлечь из этого опыта?")
+
+    def get_cab_comment(self, risk_level, change_type):
+        """Возвращает комментарий Эрика для CAB."""
+        comments = {
+            "low": "Низкий риск - это хороший кандидат для автоматизации процесса.",
+            "medium": "Средний риск требует тестирования. У вас оно есть?",
+            "high": "Высокий риск. Требуется план отката.",
+            "critical": "Критический риск. Уверены, что это необходимо прямо сейчас?"
+        }
+        return comments.get(risk_level, "Оцените риски перед внедрением.")
+
+    def get_standup_tip(self, blockers_count, morale):
+        """Возвращает совет для daily standup."""
+        if blockers_count > 0:
+            return f"У вас {blockers_count} блокеров. Каждый блокер - это остановка потока."
+        if morale < 50:
+            return "Низкий моральный дух часто связан с чувством отсутствия прогресса."
+        return "Хороший стендап фокусируется на блокерах, а не на статусе."
 
 class OpenRouterLLM:
     """Взаимодействует с LLM через OpenRouter для генерации ответов."""
@@ -336,6 +895,46 @@ class SimulationEngine:
             # (Assuming player didn't delete them, which isn't possible yet)
             if unplanned_done >= 3:
                  self._initialize_level_2()
+
+        # Проверяем критические состояния и добавляем советы ментора
+        self._check_mentor_triggers()
+
+    def _check_mentor_triggers(self):
+        """Проверяет триггеры для советов ментора на основе состояния игры."""
+        state = self.active_game_state
+
+        # Отслеживаем последние советы, чтобы не повторяться
+        if not hasattr(state, '_last_mentor_advice'):
+            state._last_mentor_advice = []
+
+        # Критическая стабильность
+        if state.stability < 30 and 'critical_stability' not in state._last_mentor_advice:
+            advice = self.llm.get_response('erik', game_state=state.to_dict())
+            state.mentor_log.append({"sender": "Эрик", "text": advice})
+            state._last_mentor_advice.append('critical_stability')
+
+        # Высокий процент незапланированной работы
+        unplanned_pct = (state.unplanned_work / (state.unplanned_work + 1)) * 100
+        if unplanned_pct > 50 and 'high_unplanned' not in state._last_mentor_advice:
+            advice = self.llm.get_response('erik', game_state=state.to_dict())
+            state.mentor_log.append({"sender": "Эрик", "text": advice})
+            state._last_mentor_advice.append('high_unplanned')
+
+        # Низкий моральный дух
+        if state.morale < 30 and 'low_morale' not in state._last_mentor_advice:
+            state.mentor_log.append({
+                "sender": "Эрик",
+                "text": "Команда выгорает. Нужно показать прогресс, даже маленький. Завершите что-нибудь."
+            })
+            state._last_mentor_advice.append('low_morale')
+
+        # Очищаем старые триггеры при улучшении ситуации
+        if state.stability > 50:
+            state._last_mentor_advice = [t for t in state._last_mentor_advice if t != 'critical_stability']
+        if unplanned_pct < 30:
+            state._last_mentor_advice = [t for t in state._last_mentor_advice if t != 'high_unplanned']
+        if state.morale > 50:
+            state._last_mentor_advice = [t for t in state._last_mentor_advice if t != 'low_morale']
 
     # --- Action Handlers ---
 
@@ -609,13 +1208,19 @@ class SimulationEngine:
         # Бонус за стендап: +morale
         state.morale = min(100, state.morale + 2)
 
+        # Подсчитываем блокеры
+        blockers_count = len([t for t in state.tasks.get('in_progress', []) if t.get('blocked')])
+
         # Проверяем все ли ответили
         all_answered = all(m_id in state.standup_answers for m_id in [m['id'] for m in state.team_members])
 
         if all_answered:
             state.morale = min(100, state.morale + 3)
             state.chat_history.append({"sender": "System", "text": "✅ Daily Standup complete! Team synced."})
-            state.mentor_log.append({"sender": "Эрик", "text": "Хороший стендап. Команда синхронизирована."})
+
+            # Контекстный совет ментора
+            mentor_tip = self.llm.get_standup_tip(blockers_count, state.morale)
+            state.mentor_log.append({"sender": "Эрик", "text": mentor_tip})
         else:
             state.chat_history.append({"sender": "System", "text": "⚠️ Standup complete - some members missing."})
 
@@ -637,18 +1242,120 @@ class SimulationEngine:
         state.chat_history.append({"sender": "System", "text": f"📅 Week {state.week} started."})
 
     def _trigger_random_event(self):
-        """Генерирует случайное событие."""
+        """Генерирует случайное событие с учётом вероятностей."""
         state = self.active_game_state
-        events = [
-            {"type": "bug", "title": "Production Bug", "impact": "stability -5"},
-            {"type": "sick", "title": "Team Member Sick", "impact": "velocity -20%"},
-            {"type": "crunch", "title": "Scope Creep Request", "impact": "backlog +1"},
-            {"type": "win", "title": "Early Completion", "impact": "budget +1000"}
-        ]
-        event = random.choice(events)
-        state.active_events.append(event)
-        state.chat_history.append({"sender": "System", "text": f"⚡ EVENT: {event['title']} - {event['impact']}"})
-        state.mentor_log.append({"sender": "Эрик", "text": f"Событие! Адаптируйся. {event['title']}."})
+
+        # Определяем доступные события на основе уровня и состояния
+        available_events = self._get_available_events(state)
+
+        if not available_events:
+            return
+
+        # Выбираем событие с учётом весов
+        event = random.choices(
+            [e['id'] for e in available_events],
+            weights=[e.get('weight', 1) for e in available_events]
+        )[0]
+
+        event_template = next(e for e in ALL_EVENTS if e['id'] == event)
+        new_event = Event.from_template(event_template, state.week)
+        state.active_events.append(new_event.to_dict())
+
+        state.chat_history.append({
+            "sender": "Event",
+            "text": f"⚡ {new_event.title}: {new_event.description}"
+        })
+        state.mentor_log.append({
+            "sender": "Эрик",
+            "text": f"Событие! {new_event.title}. Твой выбор определит последствия."
+        })
+
+    def _get_available_events(self, state):
+        """Возвращает события доступные для текущего уровня/состояния."""
+        available = []
+        for event in ALL_EVENTS:
+            # Проверяем уровень
+            if 'min_level' in event and state.level < event['min_level']:
+                continue
+            if 'max_level' in event and state.level > event['max_level']:
+                continue
+            # Проверяем условия
+            if 'condition' in event:
+                if not event['condition'](state):
+                    continue
+            available.append(event)
+        return available
+
+    def _handle_event_choice(self, action):
+        """Обрабатывает выбор игрока в событии."""
+        state = self.active_game_state
+        event_id = action.get('event_id')
+        choice_id = action.get('choice_id')
+
+        # Находим событие
+        active_event = None
+        for i, e in enumerate(state.active_events):
+            if e.get('id') == event_id:
+                active_event = e
+                # Удаляем из активных
+                state.active_events.pop(i)
+                break
+
+        if not active_event:
+            return
+
+        event_template = next((e for e in ALL_EVENTS if e['id'] == event_id), None)
+        if not event_template:
+            return
+
+        choice = next((c for c in event_template['choices'] if c['id'] == choice_id), None)
+        if not choice:
+            return
+
+        # Применяем последствия
+        for effect in choice.get('effects', []):
+            self._apply_effect(effect, state)
+
+        # Сообщение о результате
+        result_msg = choice.get('result_message', 'Done.')
+        state.chat_history.append({"sender": "Event", "text": f"✓ {result_msg}"})
+
+        # Комментарий ментора (из выбора или автоматический)
+        mentor_comment = choice.get('mentor_comment')
+        if not mentor_comment:
+            # Используем LLM для генерации комментария
+            event_type = event_template.get('type', event_template.get('id', 'general'))
+            mentor_comment = self.llm.get_event_comment(event_type)
+
+        state.mentor_log.append({
+            "sender": "Эрик",
+            "text": mentor_comment
+        })
+
+    def _apply_effect(self, effect, state):
+        """Применяет эффект события к состоянию."""
+        effect_type = effect.get('type')
+        value = effect.get('value', 0)
+
+        if effect_type == 'stability':
+            state.stability = max(0, min(100, state.stability + value))
+        elif effect_type == 'morale':
+            state.morale = max(0, min(100, state.morale + value))
+        elif effect_type == 'budget':
+            state.budget += value
+        elif effect_type == 'unplanned_work':
+            state.unplanned_work = max(0, min(100, state.unplanned_work + value))
+        elif effect_type == 'wip_limit':
+            state.wip_limit = max(1, state.wip_limit + value)
+        elif effect_type == 'add_task':
+            task = effect.get('task')
+            if task:
+                task['id'] = f"task-event-{state.week}-{random.randint(1000, 9999)}"
+                task['depends_on'] = task.get('depends_on', [])
+                state.tasks['backlog'].append(task)
+        elif effect_type == 'velocity_modifier':
+            # Временный модификатор скорости (хранится в событиях)
+            pass  # TODO: реализовать в будущем
 
     # --- CAB (Change Advisory Board) Action Handlers ---
 
@@ -673,7 +1380,10 @@ class SimulationEngine:
 
         state.pending_changes.append(change_request)
         state.chat_history.append({"sender": "System", "text": f"📋 Change Request submitted: {title}"})
-        state.mentor_log.append({"sender": "Эрик", "text": "RFC создан. CAB должен одобрить изменения перед внедрением."})
+
+        # Контекстный комментарий ментора на основе уровня риска
+        mentor_comment = self.llm.get_cab_comment(risk_level, 'general')
+        state.mentor_log.append({"sender": "Эрик", "text": mentor_comment})
 
     def _handle_cab_approve(self, action):
         """Одобрить изменение CAB."""

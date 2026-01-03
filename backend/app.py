@@ -258,6 +258,47 @@ def schedule_cab_meeting():
     return jsonify(new_state)
 
 
+# --- Mentor / LLM API Endpoints ---
+
+@app.route('/api/mentor/advice', methods=['GET'])
+def get_mentor_advice():
+    """Возвращает контекстный совет от Эрика на основе текущего состояния игры."""
+    state = engine.get_current_state()
+    if 'error' in state:
+        return jsonify(state), 400
+    advice = engine.llm.get_response('erik', game_state=state)
+    return jsonify({'advice': advice, 'sender': 'Erik', 'role': 'mentor'})
+
+@app.route('/api/mentor/event-comment', methods=['POST'])
+def get_event_comment():
+    """Возвращает комментарий Эрика для события."""
+    data = request.json
+    event_type = data.get('event_type', 'general')
+    comment = engine.llm.get_event_comment(event_type)
+    return jsonify({'comment': comment, 'sender': 'Erik', 'role': 'mentor'})
+
+@app.route('/api/mentor/cab-comment', methods=['POST'])
+def get_cab_comment():
+    """Возвращает комментарий Эрика для CAB."""
+    data = request.json
+    risk_level = data.get('risk_level', 'medium')
+    change_type = data.get('change_type', 'general')
+    comment = engine.llm.get_cab_comment(risk_level, change_type)
+    return jsonify({'comment': comment, 'sender': 'Erik', 'role': 'mentor'})
+
+@app.route('/api/mentor/standup-tip', methods=['GET'])
+def get_standup_tip():
+    """Возвращает совет для стендапа на основе текущего состояния."""
+    state = engine.get_current_state()
+    if 'error' in state:
+        return jsonify(state), 400
+
+    blockers_count = len([t for t in state.get('tasks', []) if t.get('blocked')])
+    morale = state.get('team_morale', 75)
+    tip = engine.llm.get_standup_tip(blockers_count, morale)
+    return jsonify({'tip': tip, 'sender': 'Erik', 'role': 'mentor'})
+
+
 # --- Маршрут для обслуживания фронтенда ---
 
 @app.route('/')
