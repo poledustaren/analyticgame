@@ -14,6 +14,10 @@
     --card-internal: #3b82f6;
     --card-changes: #f59e0b;
     --card-unplanned: #ef4444;
+    --card-automation: #a855f7;
+    --card-knowledge: #f97316;
+    --card-optimization: #06b6d4;
+    --card-experiment: #8b5cf6;
 }
 
 * {
@@ -230,6 +234,10 @@ body {
 .task-card.type-internal { border-left-color: var(--card-internal); }
 .task-card.type-changes { border-left-color: var(--card-changes); }
 .task-card.type-unplanned { border-left-color: var(--card-unplanned); }
+.task-card.type-automation { border-left-color: var(--card-automation); }
+.task-card.type-knowledge { border-left-color: var(--card-knowledge); }
+.task-card.type-optimization { border-left-color: var(--card-optimization); }
+.task-card.type-experiment { border-left-color: var(--card-experiment); }
 
 .task-card h4 {
     font-size: 14px;
