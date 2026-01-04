@@ -136,6 +136,30 @@
         <!-- Content generated dynamically or same as before -->
     </div>
 
+    <!-- Level Up Modal -->
+    <div id="levelup-modal" class="modal-overlay" style="display: none;">
+        <div class="levelup-content">
+            <div class="levelup-badge">
+                <span class="levelup-icon">🏆</span>
+            </div>
+            <h2 class="levelup-title">LEVEL COMPLETE!</h2>
+            <p class="levelup-level">Level <span id="levelup-old-level">1</span> → Level <span id="levelup-new-level">2</span></p>
+            <p class="levelup-message" id="levelup-message">Congratulations! You've mastered The Stabilizer.</p>
+            <div class="levelup-unlocks">
+                <h3>MECHANICS UNLOCKED</h3>
+                <ul id="levelup-unlocks-list">
+                    <!-- Dynamically populated -->
+                </ul>
+            </div>
+            <button class="levelup-continue-btn" id="levelup-continue">CONTINUE</button>
+        </div>
+    </div>
+
+    <!-- Level Up Sound -->
+    <audio id="levelup-sound" preload="auto">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3" type="audio/mpeg">
+    </audio>
+
     <script src="script.js"></script>
 </body>
 </html>

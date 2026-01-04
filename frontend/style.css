@@ -370,3 +370,229 @@ body {
 .resource-avatar:active {
     cursor: grabbing;
 }
+
+/* --- MODAL OVERLAY --- */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* --- LEVEL UP MODAL --- */
+#levelup-modal .levelup-content {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-radius: 16px;
+    padding: 40px;
+    text-align: center;
+    max-width: 500px;
+    border: 2px solid #3b82f6;
+    box-shadow: 0 0 60px rgba(59, 130, 246, 0.4);
+    animation: levelUpSlide 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes levelUpSlide {
+    0% {
+        transform: scale(0.5) translateY(-50px);
+        opacity: 0;
+    }
+    60% {
+        transform: scale(1.05) translateY(0);
+    }
+    100% {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+    }
+}
+
+.levelup-badge {
+    width: 100px;
+    height: 100px;
+    margin: 0 auto 24px;
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: badgePop 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both,
+               badgeGlow 2s ease-in-out infinite alternate;
+    box-shadow: 0 0 30px rgba(59, 130, 246, 0.6);
+}
+
+@keyframes badgePop {
+    0% {
+        transform: scale(0) rotate(-180deg);
+    }
+    100% {
+        transform: scale(1) rotate(0deg);
+    }
+}
+
+@keyframes badgeGlow {
+    0% {
+        box-shadow: 0 0 30px rgba(59, 130, 246, 0.6);
+    }
+    100% {
+        box-shadow: 0 0 50px rgba(139, 92, 246, 0.8);
+    }
+}
+
+.levelup-icon {
+    font-size: 48px;
+    animation: iconBounce 1s ease-in-out infinite;
+}
+
+@keyframes iconBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+}
+
+.levelup-title {
+    font-size: 32px;
+    font-weight: 700;
+    background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 16px;
+    animation: titleShimmer 2s linear infinite;
+    background-size: 200% 100%;
+}
+
+@keyframes titleShimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+.levelup-level {
+    font-size: 20px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+}
+
+.levelup-level span {
+    color: var(--accent-primary);
+    font-weight: 700;
+}
+
+.levelup-message {
+    font-size: 16px;
+    color: var(--text-primary);
+    margin-bottom: 24px;
+    line-height: 1.5;
+}
+
+.levelup-unlocks {
+    background: rgba(59, 130, 246, 0.1);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    animation: unlocksFade 0.5s ease-out 0.4s both;
+}
+
+@keyframes unlocksFade {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.levelup-unlocks h3 {
+    font-size: 12px;
+    color: var(--accent-primary);
+    letter-spacing: 0.1em;
+    margin-bottom: 12px;
+}
+
+.levelup-unlocks ul {
+    list-style: none;
+    padding: 0;
+    text-align: left;
+}
+
+.levelup-unlocks li {
+    padding: 8px 0;
+    padding-left: 28px;
+    position: relative;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.levelup-unlocks li::before {
+    content: '✓';
+    position: absolute;
+    left: 0;
+    color: var(--accent-success);
+    font-weight: bold;
+}
+
+.levelup-continue-btn {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    border: none;
+    padding: 14px 48px;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    animation: btnFade 0.5s ease-out 0.6s both;
+}
+
+.levelup-continue-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
+}
+
+@keyframes btnFade {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Confetti particles */
+#levelup-modal {
+    overflow: hidden;
+}
+
+.confetti {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    top: 0;
+    animation: confettiFall 3s ease-out forwards;
+    pointer-events: none;
+}
+
+@keyframes confettiFall {
+    0% {
+        transform: translateY(-100px) rotate(0deg);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(100vh) rotate(720deg);
+        opacity: 0;
+    }
+}

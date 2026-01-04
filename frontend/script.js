@@ -26,14 +26,59 @@ document.addEventListener('DOMContentLoaded', () => {
     const tabBtns = document.querySelectorAll('.tab-btn');
     const tabContents = document.querySelectorAll('.tab-content');
 
+    // Level Up Modal
+    const levelupModal = document.getElementById('levelup-modal');
+    const levelupSound = document.getElementById('levelup-sound');
+    const levelupOldLevel = document.getElementById('levelup-old-level');
+    const levelupNewLevel = document.getElementById('levelup-new-level');
+    const levelupMessage = document.getElementById('levelup-message');
+    const levelupUnlocksList = document.getElementById('levelup-unlocks-list');
+    const levelupContinueBtn = document.getElementById('levelup-continue');
+
     // --- State Management ---
     let currentState = null;
+
+    // --- Level Up Data ---
+    const levelData = {
+        1: {
+            title: "The Stabilizer",
+            message: "You've mastered the basics! Brent is still a bottleneck, but you're learning to manage unplanned work."
+        },
+        2: {
+            title: "The First Way (Flow)",
+            message: "Excellent progress! You've introduced WIP limits to improve flow and reduce context switching.",
+            unlocks: [
+                "WIP Limits - Limit work in progress to improve throughput",
+                "Flow Visualization - See bottlenecks in real-time",
+                "Little's Law - Understand the relationship between WIP, throughput, and lead time"
+            ]
+        },
+        3: {
+            title: "The Second Way (Feedback)",
+            message: "Great job! You're now creating fast feedback loops from right to left.",
+            unlocks: [
+                "CAB (Change Advisory Board) - Manage changes more safely",
+                "Quality Metrics - Track defects and rework",
+                "Fast Feedback - Catch issues sooner"
+            ]
+        },
+        4: {
+            title: "The Third Way (Culture)",
+            message: "Outstanding! You've built a culture of continual learning and experimentation.",
+            unlocks: [
+                "Blameless Post-Mortems - Learn from failures without blame",
+                "Continual Improvement - Small experiments every week",
+                "Learning Organization - Share knowledge across teams"
+            ]
+        }
+    };
 
     // --- Initialization ---
     function init() {
         // Attach Event Listeners
         newGameBtn.onclick = startNewGame;
         saveGameBtn.onclick = handleSaveGame;
+        levelupContinueBtn.onclick = hideLevelUpModal;
 
         tabBtns.forEach(btn => {
             btn.addEventListener('click', () => {
@@ -79,11 +124,64 @@ document.addEventListener('DOMContentLoaded', () => {
         alert("Save functionality placeholder.");
     }
 
+    // --- Level Up Modal Functions ---
+    function showLevelUpModal(oldLevel, newLevel) {
+        // Update modal content
+        levelupOldLevel.textContent = oldLevel;
+        levelupNewLevel.textContent = newLevel;
+
+        const data = levelData[newLevel];
+        levelupMessage.textContent = data.message;
+
+        // Populate unlocks list
+        levelupUnlocksList.innerHTML = '';
+        if (data.unlocks && data.unlocks.length > 0) {
+            data.unlocks.forEach(unlock => {
+                const li = document.createElement('li');
+                li.textContent = unlock;
+                levelupUnlocksList.appendChild(li);
+            });
+        } else {
+            levelupUnlocksList.parentElement.style.display = 'none';
+        }
+
+        // Play sound
+        levelupSound.currentTime = 0;
+        levelupSound.play().catch(err => console.log('Audio play failed:', err));
+
+        // Show modal
+        levelupModal.style.display = 'flex';
+
+        // Add confetti effect
+        createConfetti();
+    }
+
+    function hideLevelUpModal() {
+        levelupModal.style.display = 'none';
+    }
+
+    function createConfetti() {
+        const colors = ['#3b82f6', '#8b5cf6', '#ec4899', '#22c55e', '#f59e0b'];
+        for (let i = 0; i < 50; i++) {
+            setTimeout(() => {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = Math.random() * 100 + 'vw';
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.animationDelay = Math.random() * 0.5 + 's';
+                levelupModal.appendChild(confetti);
+
+                // Remove after animation
+                setTimeout(() => confetti.remove(), 3000);
+            }, i * 30);
+        }
+    }
+
     // --- Rendering Logic ---
     function render(state) {
-        // Check for Level Change (Transition Animation placeholder)
+        // Check for Level Change and show modal
         if (currentState && currentState.level < state.level) {
-            alert(`CONGRATULATIONS! Level ${currentState.level} Complete.\nStarting Level ${state.level}: The First Way (Flow)`);
+            showLevelUpModal(currentState.level, state.level);
         }
 
         currentState = state;
