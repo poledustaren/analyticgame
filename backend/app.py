@@ -41,6 +41,13 @@ def get_state():
     """Возвращает текущее состояние активной игры."""
     return jsonify(engine.get_current_state())
 
+@app.route('/api/dismiss', methods=['POST'])
+def dismiss_notification():
+    """Отклоняет уведомление (game_over, level_up)."""
+    data = request.json
+    notification_type = data.get('type')
+    return jsonify(engine.dismiss_notification(notification_type))
+
 @app.route('/api/action', methods=['POST'])
 def handle_action():
     """Обрабатывает действия игрока в активной сессии."""

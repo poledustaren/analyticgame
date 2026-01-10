@@ -614,6 +614,12 @@ class GameState:
         # Event System
         self.event_chance = 0.15   # Base chance for event after each action
 
+        # Game Over State
+        self.game_over = None  # {'reason': str, 'title': str, 'message': str} or None
+
+        # Level Up State
+        self.level_up = None  # {'from': int, 'to': int, 'message': str} or None
+
         # Sprint System
         self.current_sprint = None
         self.sprint_history = []
@@ -728,6 +734,19 @@ class SimulationEngine:
         saves = glob.glob(os.path.join(SAVES_DIR, 'save_*.json'))
         return sorted([os.path.basename(s).replace('save_', '').replace('.json', '') for s in saves])
 
+    def dismiss_notification(self, notification_type):
+        """Отклоняет уведомление и очищает его состояние."""
+        if not self.active_game_state:
+            return {"error": "Нет активной игры."}
+
+        state = self.active_game_state
+        if notification_type == 'game_over':
+            state.game_over = None
+        elif notification_type == 'level_up':
+            state.level_up = None
+
+        return state.to_dict()
+
     def get_current_state(self):
         if not self.active_game_state: return {"error": "Нет активной игры."}
         return self.active_game_state.to_dict()
@@ -784,9 +803,21 @@ class SimulationEngine:
 
     def _initialize_level_2(self):
         state = self.active_game_state
+        old_level = state.level
         state.level = 2
         state.wip_limit = 3 # Strict Limit for Level 2
         state.unplanned_work = 20 # Stabilized
+
+        # Set level_up notification for frontend
+        state.level_up = {
+            'from': old_level,
+            'to': 2,
+            'message': 'LEVEL UP! Ты потушил все пожары. Теперь учись видеть поток.',
+            'stats': {
+                'title': 'The Visualizer',
+                'objective': 'Maintain 80%+ stability for 3 weeks while completing business value.'
+            }
+        }
 
         # Keep existing 'Done' tasks but archive them conceptually.
         # For simplicity, let's keep Phoenix in Backlog if it wasn't started, or move it to In Progress.
