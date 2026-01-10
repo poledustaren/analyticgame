@@ -4,8 +4,517 @@ import os
 import glob
 from datetime import datetime, timedelta
 from enum import Enum
+from typing import List, Dict, Callable, Optional
 
 SAVES_DIR = os.path.join(os.path.dirname(__file__), 'saves')
+
+# --- Event System ---
+
+class EventSeverity(Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+class EventType(Enum):
+    TECHNICAL = "technical"      # Bugs, outages, technical debt
+    BUSINESS = "business"        # Requirement changes, stakeholder requests
+    TEAM = "team"                # Resource issues, conflicts, morale
+    EXTERNAL = "external"        # Vendor problems, regulatory changes
+    RANDOM = "random"            # Pure chance events
+
+class Event:
+    """Represents a procedural event with choices and consequences."""
+    def __init__(self, event_id: str, title: str, description: str,
+                 event_type: EventType, severity: EventSeverity,
+                 choices: List[Dict], trigger_conditions: Optional[Dict] = None):
+        self.id = event_id
+        self.title = title
+        self.description = description
+        self.type = event_type
+        self.severity = severity
+        self.choices = choices  # List of {"id": str, "text": str, "consequences": Dict}
+        self.trigger_conditions = trigger_conditions or {}
+        self.timestamp = datetime.now()
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "title": self.title,
+            "description": self.description,
+            "type": self.type.value,
+            "severity": self.severity.value,
+            "choices": self.choices,
+            "timestamp": self.timestamp.isoformat()
+        }
+
+class EventLibrary:
+    """Library of event templates for procedural generation."""
+
+    TECHNICAL_EVENTS = [
+        {
+            "id": "tech-bug-prod",
+            "title": "🐛 Production Bug Detected",
+            "description": "Critical bug found in production. Customers are reporting issues.",
+            "type": EventType.TECHNICAL,
+            "severity": EventSeverity.HIGH,
+            "trigger": {"unplanned_work": 0, "level": [1, 2, 3]},
+            "choices": [
+                {
+                    "id": "hotfix",
+                    "text": "🔥 Deploy hotfix immediately (risky)",
+                    "consequences": {"budget": -5000, "stability": -10, "unplanned_work": 15}
+                },
+                {
+                    "id": "investigate",
+                    "text": "🔍 Investigate first (safer but slower)",
+                    "consequences": {"budget": -2000, "stability": -5, "unplanned_work": 10}
+                },
+                {
+                    "id": "ignore",
+                    "text": "⏳ Wait for next release",
+                    "consequences": {"stability": -20, "morale": -15}
+                }
+            ]
+        },
+        {
+            "id": "tech-debt",
+            "title": "🏗️ Technical Debt Accumulating",
+            "description": "Code review shows increasing technical debt in core modules.",
+            "type": EventType.TECHNICAL,
+            "severity": EventSeverity.MEDIUM,
+            "trigger": {"level": [2, 3, 4]},
+            "choices": [
+                {
+                    "id": "refactor-now",
+                    "text": "Refactor now (delay features)",
+                    "consequences": {"budget": -8000, "unplanned_work": -10, "stability": 15}
+                },
+                {
+                    "id": "refactor-later",
+                    "text": "Schedule for next sprint",
+                    "consequences": {"unplanned_work": 5, "stability": -5}
+                }
+            ]
+        },
+        {
+            "id": "tech-server-down",
+            "title": "🔴 Server Outage",
+            "description": "Main application server is down. Revenue is being lost every minute!",
+            "type": EventType.TECHNICAL,
+            "severity": EventSeverity.CRITICAL,
+            "trigger": {"random_chance": 0.05, "level": [1, 2]},
+            "choices": [
+                {
+                    "id": "restart",
+                    "text": "Quick restart (may lose data)",
+                    "consequences": {"budget": -3000, "stability": -15, "unplanned_work": 20}
+                },
+                {
+                    "id": "backup",
+                    "text": "Restore from backup (slower)",
+                    "consequences": {"budget": -7000, "stability": 5, "unplanned_work": 25}
+                },
+                {
+                    "id": "brent-fix",
+                    "text": "Have Brent investigate",
+                    "consequences": {"budget": -4000, "stability": 5, "unplanned_work": 15}
+                }
+            ]
+        },
+        {
+            "id": "tech-deployment-fail",
+            "title": "⚠️ Deployment Failed",
+            "description": "Last night's deployment failed. Rollback may be needed.",
+            "type": EventType.TECHNICAL,
+            "severity": EventSeverity.MEDIUM,
+            "trigger": {"random_chance": 0.08},
+            "choices": [
+                {
+                    "id": "rollback",
+                    "text": "Rollback immediately",
+                    "consequences": {"budget": -2000, "unplanned_work": 10}
+                },
+                {
+                    "id": "forward-fix",
+                    "text": "Fix and redeploy",
+                    "consequences": {"budget": -5000, "unplanned_work": 15, "stability": -10}
+                }
+            ]
+        }
+    ]
+
+    BUSINESS_EVENTS = [
+        {
+            "id": "biz-req-change",
+            "title": "📝 Requirement Change Request",
+            "description": "Stakeholder wants to change a key feature. It affects current sprint.",
+            "type": EventType.BUSINESS,
+            "severity": EventSeverity.MEDIUM,
+            "trigger": {"level": [1, 2, 3]},
+            "choices": [
+                {
+                    "id": "accept",
+                    "text": "Accept change (reprioritize)",
+                    "consequences": {"budget": -3000, "unplanned_work": 10, "stability": -5}
+                },
+                {
+                    "id": "defer",
+                    "text": "Defer to next sprint",
+                    "consequences": {"stability": 5}
+                },
+                {
+                    "id": "negotiate",
+                    "text": "Negotiate scope reduction",
+                    "consequences": {"budget": -1000, "stability": 5}
+                }
+            ]
+        },
+        {
+            "id": "biz-deadline",
+            "title": "⏰ Deadline Accelerated",
+            "description": "Management wants the project delivered 2 weeks earlier!",
+            "type": EventType.BUSINESS,
+            "severity": EventSeverity.HIGH,
+            "trigger": {"random_chance": 0.06, "level": [1, 2, 3]},
+            "choices": [
+                {
+                    "id": "crunch",
+                    "text": "Work overtime (burn risk)",
+                    "consequences": {"budget": -10000, "morale": -20, "stability": -10}
+                },
+                {
+                    "id": "cut-scope",
+                    "text": "Cut non-essential features",
+                    "consequences": {"stability": -5, "unplanned_work": -5}
+                },
+                {
+                    "id": "push-back",
+                    "text": "Push back on deadline",
+                    "consequences": {"stability": -15}
+                }
+            ]
+        },
+        {
+            "id": "biz-new-feature",
+            "title": "✨ New Feature Request",
+            "description": "Marketing wants a new feature for upcoming campaign.",
+            "type": EventType.BUSINESS,
+            "severity": EventSeverity.LOW,
+            "trigger": {"random_chance": 0.1},
+            "choices": [
+                {
+                    "id": "accept",
+                    "text": "Add to backlog",
+                    "consequences": {"unplanned_work": 5}
+                },
+                {
+                    "id": "decline",
+                    "text": "Decline for now",
+                    "consequences": {"stability": 5}
+                }
+            ]
+        }
+    ]
+
+    TEAM_EVENTS = [
+        {
+            "id": "team-sick-day",
+            "title": "🤒 Team Member Sick",
+            "description": "A key developer is out sick. Velocity will be affected.",
+            "type": EventType.TEAM,
+            "severity": EventSeverity.LOW,
+            "trigger": {"random_chance": 0.08},
+            "choices": [
+                {
+                    "id": "cover",
+                    "text": "Others cover the work",
+                    "consequences": {"morale": -5, "unplanned_work": 5}
+                },
+                {
+                    "id": "delay",
+                    "text": "Delay non-critical tasks",
+                    "consequences": {"stability": -5}
+                }
+            ]
+        },
+        {
+            "id": "team-conflict",
+            "title": "😤 Team Conflict",
+            "description": "Disagreement between team members on technical approach.",
+            "type": EventType.TEAM,
+            "severity": EventSeverity.MEDIUM,
+            "trigger": {"random_chance": 0.05},
+            "choices": [
+                {
+                    "id": "mediate",
+                    "text": "Mediate the discussion",
+                    "consequences": {"stability": 5, "budget": -1000}
+                },
+                {
+                    "id": "decide",
+                    "text": "Make an executive decision",
+                    "consequences": {"morale": -10, "stability": -5}
+                }
+            ]
+        },
+        {
+            "id": "team-low-morale",
+            "title": "😔 Low Team Morale",
+            "description": "Team seems burned out from recent crunch.",
+            "type": EventType.TEAM,
+            "severity": EventSeverity.MEDIUM,
+            "trigger": {"morale_below": 50},
+            "choices": [
+                {
+                    "id": "team-lunch",
+                    "text": "Team building activity",
+                    "consequences": {"budget": -1500, "morale": 15}
+                },
+                {
+                    "id": "time-off",
+                    "text": "Encourage time off",
+                    "consequences": {"unplanned_work": 5, "morale": 10}
+                },
+                {
+                    "id": "push-through",
+                    "text": "Push through (risky)",
+                    "consequences": {"morale": -15, "stability": -10}
+                }
+            ]
+        }
+    ]
+
+    EXTERNAL_EVENTS = [
+        {
+            "id": "ext-vendor-delay",
+            "title": "📦 Vendor Delay",
+            "description": "Key vendor is delayed on delivering critical component.",
+            "type": EventType.EXTERNAL,
+            "severity": EventSeverity.HIGH,
+            "trigger": {"random_chance": 0.06},
+            "choices": [
+                {
+                    "id": "wait",
+                    "text": "Wait for vendor",
+                    "consequences": {"stability": -10, "unplanned_work": 10}
+                },
+                {
+                    "id": "alternative",
+                    "text": "Find alternative (costly)",
+                    "consequences": {"budget": -8000, "stability": 5}
+                },
+                {
+                    "id": "build",
+                    "text": "Build in-house",
+                    "consequences": {"budget": -12000, "unplanned_work": 15}
+                }
+            ]
+        },
+        {
+            "id": "ext-security-audit",
+            "title": "🔒 Security Audit Required",
+            "description": "External compliance requires immediate security audit.",
+            "type": EventType.EXTERNAL,
+            "severity": EventSeverity.HIGH,
+            "trigger": {"random_chance": 0.04, "level": [2, 3, 4]},
+            "choices": [
+                {
+                    "id": "immediate",
+                    "text": "Conduct immediately (disruptive)",
+                    "consequences": {"budget": -5000, "unplanned_work": 20, "stability": 10}
+                },
+                {
+                    "id": "schedule",
+                    "text": "Schedule for next sprint",
+                    "consequences": {"stability": -10}
+                }
+            ]
+        }
+    ]
+
+    LEVEL_SPECIFIC_EVENTS = {
+        1: [  # Chaos phase - more unplanned work
+            {
+                "id": "lvl1-fire",
+                "title": "🔥 Another Fire!",
+                "description": "Something else broke. Can you believe it?",
+                "type": EventType.TECHNICAL,
+                "severity": EventSeverity.HIGH,
+                "trigger": {"unplanned_work_above": 50},
+                "choices": [
+                    {
+                        "id": "brent",
+                        "text": "Brent handles it",
+                        "consequences": {"unplanned_work": 5}
+                    },
+                    {
+                        "id": "team",
+                        "text": "Let team handle",
+                        "consequences": {"unplanned_work": 15, "morale": -10}
+                    }
+                ]
+            }
+        ],
+        2: [  # Flow phase - WIP management
+            {
+                "id": "lvl2-wip-exceeded",
+                "title": "📊 WIP Limit Analysis",
+                "description": "Erik notices you're approaching WIP limit frequently.",
+                "type": EventType.TEAM,
+                "severity": EventSeverity.LOW,
+                "trigger": {"wip_near_limit": True},
+                "choices": [
+                    {
+                        "id": "lower-limit",
+                        "text": "Lower WIP limit further",
+                        "consequences": {"wip_limit": -1, "stability": 5}
+                    },
+                    {
+                        "id": "keep",
+                        "text": "Keep current limit",
+                        "consequences": {}
+                    }
+                ]
+            }
+        ],
+        3: [  # Level 3 - more complex
+            {
+                "id": "lvl3-knowledge-gap",
+                "title": "📚 Knowledge Gap Detected",
+                "description": "Team lacks documentation for critical system.",
+                "type": EventType.TECHNICAL,
+                "severity": EventSeverity.MEDIUM,
+                "trigger": {"random_chance": 0.08},
+                "choices": [
+                    {
+                        "id": "document",
+                        "text": "Sprint documentation",
+                        "consequences": {"budget": -4000, "unplanned_work": 10, "stability": 10}
+                    },
+                    {
+                        "id": "mentor",
+                        "text": "Pair programming sessions",
+                        "consequences": {"budget": -2000, "stability": 5}
+                    }
+                ]
+            }
+        ]
+    }
+
+    @classmethod
+    def get_all_events(cls) -> List[Dict]:
+        """Get all event templates."""
+        all_events = []
+        all_events.extend(cls.TECHNICAL_EVENTS)
+        all_events.extend(cls.BUSINESS_EVENTS)
+        all_events.extend(cls.TEAM_EVENTS)
+        all_events.extend(cls.EXTERNAL_EVENTS)
+        return all_events
+
+    @classmethod
+    def get_events_for_level(cls, level: int) -> List[Dict]:
+        """Get events applicable to specific level."""
+        all_events = cls.get_all_events()
+        level_events = cls.LEVEL_SPECIFIC_EVENTS.get(level, [])
+        all_events.extend(level_events)
+        return all_events
+
+class EventGenerator:
+    """Procedurally generates events based on game state."""
+
+    def __init__(self, event_library: EventLibrary = None):
+        self.library = event_library or EventLibrary()
+        self.triggered_events = set()  # Track events that already triggered this session
+
+    def can_trigger(self, event_template: Dict, state: 'GameState') -> bool:
+        """Check if event conditions are met."""
+        conditions = event_template.get("trigger", {})
+
+        # Check level requirement
+        if "level" in conditions:
+            if state.level not in conditions["level"]:
+                return False
+
+        # Check random chance
+        if "random_chance" in conditions:
+            if random.random() > conditions["random_chance"]:
+                return False
+
+        # Check unplanned work threshold
+        if "unplanned_work_above" in conditions:
+            if state.unplanned_work <= conditions["unplanned_work_above"]:
+                return False
+
+        if "unplanned_work" in conditions:
+            if state.unplanned_work > conditions["unplanned_work"]:
+                return False
+
+        # Check morale threshold
+        if "morale_below" in conditions:
+            if state.morale >= conditions["morale_below"]:
+                return False
+
+        # Check WIP near limit
+        if conditions.get("wip_near_limit"):
+            in_progress = len(state.tasks.get("in_progress", []))
+            if in_progress < state.wip_limit - 1:
+                return False
+
+        # Check if already triggered
+        if event_template["id"] in self.triggered_events:
+            return False
+
+        return True
+
+    def generate_event(self, state: 'GameState') -> Optional[Event]:
+        """Generate a random event based on current state."""
+        available_events = self.library.get_events_for_level(state.level)
+
+        # Filter events that can trigger
+        candidates = []
+        for event_template in available_events:
+            if self.can_trigger(event_template, state):
+                candidates.append(event_template)
+
+        if not candidates:
+            return None
+
+        # Weight by severity (critical events rarer)
+        severity_weights = {
+            EventSeverity.CRITICAL: 1,
+            EventSeverity.HIGH: 2,
+            EventSeverity.MEDIUM: 3,
+            EventSeverity.LOW: 4
+        }
+
+        # Calculate weights for candidates
+        weights = []
+        for candidate in candidates:
+            severity = candidate.get("severity", EventSeverity.MEDIUM)
+            weights.append(severity_weights.get(severity, 3))
+
+        # Select event
+        selected = random.choices(candidates, weights=weights, k=1)[0]
+
+        # Mark as triggered
+        self.triggered_events.add(selected["id"])
+
+        # Create Event object
+        return Event(
+            event_id=selected["id"],
+            title=selected["title"],
+            description=selected["description"],
+            event_type=selected["type"],
+            severity=selected["severity"],
+            choices=selected["choices"]
+        )
+
+    def reset_triggered(self):
+        """Reset triggered events (call on new game)."""
+        self.triggered_events.clear()
+
+# --- Sprint System ---
 
 class SprintPhase(Enum):
     PLANNING = "planning"
@@ -89,6 +598,11 @@ class GameState:
         }
 
         self.active_events = []
+        self.pending_event = None  # Event waiting for player response
+        self.event_history = []    # Past events and their outcomes
+
+        # Event System
+        self.event_chance = 0.15   # Base chance for event after each action
 
         # Sprint System
         self.current_sprint = None
@@ -101,6 +615,15 @@ class GameState:
         if self.current_sprint:
             data['current_sprint'] = self.current_sprint.to_dict()
         data['sprint_history'] = [s.to_dict() for s in self.sprint_history]
+        # Serialize pending event
+        if self.pending_event:
+            data['pending_event'] = self.pending_event.to_dict()
+        # Serialize event history
+        data['event_history'] = [
+            {"event": e["event"].to_dict() if hasattr(e["event"], "to_dict") else e["event"],
+             "choice_id": e["choice_id"], "consequences": e["consequences"]}
+            for e in self.event_history
+        ]
         return data
 
     @classmethod
@@ -163,12 +686,14 @@ class SimulationEngine:
     def __init__(self):
         self.active_game_state = None
         self.llm = MockLLM()
+        self.event_generator = EventGenerator()
 
         if not os.path.exists(SAVES_DIR):
             os.makedirs(SAVES_DIR)
 
     def new_game(self):
         self.active_game_state = GameState()
+        self.event_generator.reset_triggered()
         self._initialize_level_1()
         return self.active_game_state.to_dict()
 
@@ -211,6 +736,7 @@ class SimulationEngine:
         elif action_type == 'sprint_complete_retro': self._handle_sprint_complete_retro(action)
 
         self._check_level_transition()
+        self._try_trigger_event()
         return self.active_game_state.to_dict()
 
     def _initialize_level_1(self):
@@ -308,7 +834,93 @@ class SimulationEngine:
                      state.mentor_log.append({"sender": "Эрик", "text": "Брент снова нужен? Помни, он не масштабируется."})
 
     def _handle_event_choice(self, action):
-        pass
+        """Handle player's choice for an event."""
+        state = self.active_game_state
+
+        if not state.pending_event:
+            return
+
+        choice_id = action.get('choice_id')
+        event = state.pending_event
+
+        # Find the selected choice
+        selected_choice = None
+        for choice in event.choices:
+            if choice['id'] == choice_id:
+                selected_choice = choice
+                break
+
+        if not selected_choice:
+            return
+
+        # Apply consequences
+        consequences = selected_choice.get('consequences', {})
+        applied = []
+
+        for key, value in consequences.items():
+            if key == 'budget':
+                state.budget += value
+                applied.append(f"Budget {'+$' if value >= 0 else '-$'}{abs(value)}")
+            elif key == 'stability':
+                state.stability = max(0, min(100, state.stability + value))
+                applied.append(f"Stability {'+' if value >= 0 else ''}{value}%")
+            elif key == 'morale':
+                state.morale = max(0, min(100, state.morale + value))
+                applied.append(f"Morale {'+' if value >= 0 else ''}{value}%")
+            elif key == 'unplanned_work':
+                state.unplanned_work = max(0, min(100, state.unplanned_work + value))
+                applied.append(f"Unplanned Work {'+' if value >= 0 else ''}{value}%")
+            elif key == 'wip_limit':
+                state.wip_limit = max(1, state.wip_limit + value)
+                applied.append(f"WIP Limit: {state.wip_limit}")
+
+        # Add to event history
+        state.event_history.append({
+            "event": event,
+            "choice_id": choice_id,
+            "choice_text": selected_choice['text'],
+            "consequences": consequences
+        })
+
+        # Log the outcome
+        result_text = f"Event resolved: {event.title}"
+        if applied:
+            result_text += f" | {', '.join(applied)}"
+        state.chat_history.append({"sender": "System", "text": result_text})
+
+        # Mentor feedback based on consequences
+        if consequences.get('stability', 0) < -10:
+            state.mentor_log.append({"sender": "Эрик", "text": "That choice has consequences. Consider the long-term impact on system stability."})
+        elif consequences.get('unplanned_work', 0) > 10:
+            state.mentor_log.append({"sender": "Эрик", "text": "You're adding more unplanned work. This is how fires start."})
+
+        # Clear pending event
+        state.pending_event = None
+
+    def _try_trigger_event(self):
+        """Try to trigger a random event based on game state."""
+        state = self.active_game_state
+
+        # Don't trigger if there's already a pending event
+        if state.pending_event:
+            return
+
+        # Don't trigger during modal phases (review/retro)
+        if state.current_sprint and state.current_sprint.phase in [SprintPhase.REVIEW, SprintPhase.RETRO]:
+            return
+
+        # Roll for event chance
+        if random.random() > state.event_chance:
+            return
+
+        # Try to generate an event
+        event = self.event_generator.generate_event(state)
+        if event:
+            state.pending_event = event
+            state.chat_history.append({
+                "sender": "EVENT",
+                "text": f"🚨 {event.title}: {event.description}"
+            })
 
     def _handle_quiz_answer(self, action):
         pass
