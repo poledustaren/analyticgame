@@ -631,6 +631,10 @@ class GameState:
         self.standup_count = 0
         self.last_standup_week = 0
 
+        # Training System (Level 2 feature)
+        self.training_in_progress = None  # {"trainee_id": "...", "weeks_remaining": N}
+        self.trainee_count = 0
+
     def to_dict(self):
         data = self.__dict__.copy()
         if self.current_sprint:
@@ -761,6 +765,8 @@ class SimulationEngine:
         elif action_type == 'set_wip_limit': self._handle_set_wip_limit(action)
         elif action_type == 'minigame_result': self._handle_minigame_result(action)
         elif action_type == 'assign_resource': self._handle_assign_resource(action)
+        elif action_type == 'train_developer': self._handle_train_developer(action)
+        elif action_type == 'advance_week': self._handle_advance_week(action)
         # Sprint actions
         elif action_type == 'sprint_create': self._handle_sprint_create(action)
         elif action_type == 'sprint_start': self._handle_sprint_start(action)
@@ -833,6 +839,8 @@ class SimulationEngine:
 
         state.chat_history.append({"sender": "System", "text": "--- УРОВЕНЬ 2: УВИДЕТЬ ПОТОК ---"})
         state.mentor_log.append({"sender": "Эрик", "text": "Поздравляю, ты потушил пожары. Теперь ты должен научиться видеть поток. Мы вводим WIP-лимиты. Не бери в работу больше 3 задач одновременно!"})
+        state.chat_history.append({"sender": "System", "text": "НОВАЯ МЕХАНИКА: Брент может обучать других разработчиков. Это займет время, но снизит зависимость от одного узкого места."})
+        state.mentor_log.append({"sender": "Эрик", "text": "Брент — твое узкое место. Ты можешь продолжать использовать его как затычку, ИЛИ он может обучить других. Выбор за тобой."})
 
     def _initialize_level_3(self):
         state = self.active_game_state
@@ -958,6 +966,25 @@ class SimulationEngine:
         resource = next((r for r in state.resources if r['id'] == resource_id), None)
         if not resource: return
 
+        # Find the task to check requirements
+        task = None
+        for col in state.tasks.values():
+            for t in col:
+                if t['id'] == task_id:
+                    task = t
+                    break
+            if task: break
+
+        if not task: return
+
+        # Check if resource can handle the task
+        required_resource = task.get('required_resource')
+        if required_resource == 'brent':
+            # Only Brent or trained developers can handle Brent-required tasks
+            if resource_id != 'brent' and not resource.get('can_handle_brent_tasks'):
+                state.chat_history.append({"sender": "System", "text": f"{resource['name']} не имеет экспертизы для этой задачи. Требуется Брент или обученный разработчик."})
+                return
+
         if resource['busy_task_id']:
             for col in state.tasks.values():
                 for t in col:
@@ -982,6 +1009,9 @@ class SimulationEngine:
                      state.mentor_log.append({"sender": "Эрик", "text": "Ты используешь Брента как затычку. Он — твое ограничение."})
                 else:
                      state.mentor_log.append({"sender": "Эрик", "text": "Брент снова нужен? Помни, он не масштабируется."})
+            elif resource.get('can_handle_brent_tasks'):
+                # A trained developer is handling a Brent task
+                state.mentor_log.append({"sender": "Эрик", "text": f"Отлично! {resource['name']} берет на себя часть нагрузки Брента. Вот так работает расширение ограничения!"})
 
     def _handle_event_choice(self, action):
         """Handle player's choice for an event."""
@@ -1114,6 +1144,86 @@ class SimulationEngine:
 
     def _handle_minigame_result(self, action):
         pass
+
+    def _handle_train_developer(self, action):
+        """Начать обучение нового разработчика с помощью Брента."""
+        state = self.active_game_state
+
+        # Only available in Level 2+
+        if state.level < 2:
+            state.chat_history.append({"sender": "System", "text": "Обучение доступно только на Уровне 2 и выше."})
+            return
+
+        # Check if training is already in progress
+        if state.training_in_progress:
+            state.chat_history.append({"sender": "System", "text": f"Обучение уже идет! Осталось {state.training_in_progress['weeks_remaining']} нед."})
+            return
+
+        # Check if Brent is available
+        brent = next((r for r in state.resources if r['id'] == 'brent'), None)
+        if not brent:
+            return
+
+        if brent.get('busy_task_id'):
+            state.chat_history.append({"sender": "System", "text": "Брент занят! Он не может обучать, пока работает над задачей."})
+            state.mentor_log.append({"sender": "Эрик", "text": "Чтобы обучить кого-то, Брент должен быть свободен. Освободи его от текущих задач."})
+            return
+
+        # Start training (takes 3 weeks)
+        trainee_id = f"trainee_{state.trainee_count + 1}"
+        state.trainee_count += 1
+        state.training_in_progress = {
+            "trainee_id": trainee_id,
+            "trainee_name": f"Стажер {state.trainee_count}",
+            "weeks_remaining": 3
+        }
+
+        # Mark Brent as busy with training
+        brent['busy_task_id'] = 'training'
+
+        state.chat_history.append({"sender": "System", "text": f"Брент начал обучение стажера! Это займет 3 недели. Брент недоступен для задач."})
+        state.mentor_log.append({"sender": "Эрик", "text": "Хорошее решение. Инвестиция в обучение. Короткосрочно Брент недоступен, но долгосрочно ты снизишь зависимость от одного узкого места."})
+
+    def _handle_advance_week(self, action):
+        """Продвинуть время на 1 неделю. Обновляет обучение, прогресс задач."""
+        state = self.active_game_state
+        state.week += 1
+
+        # Update training progress
+        if state.training_in_progress:
+            state.training_in_progress['weeks_remaining'] -= 1
+
+            if state.training_in_progress['weeks_remaining'] <= 0:
+                # Training complete! Add new resource
+                trainee_id = state.training_in_progress['trainee_id']
+                trainee_name = state.training_in_progress['trainee_name']
+
+                new_resource = {
+                    "id": trainee_id,
+                    "name": trainee_name,
+                    "role": "Developer",
+                    "avatar": "dev_avatar.png",
+                    "busy_task_id": None,
+                    "can_handle_brent_tasks": True  # Key: can now do tasks requiring Brent
+                }
+
+                state.resources.append(new_resource)
+
+                # Free up Brent
+                brent = next((r for r in state.resources if r['id'] == 'brent'), None)
+                if brent:
+                    brent['busy_task_id'] = None
+
+                state.chat_history.append({"sender": "System", "text": f"Обучение завершено! {trainee_name} теперь готов к работе и может выполнять задачи, требующие экспертизы Брента!"})
+                state.mentor_log.append({"sender": "Эрик", "text": f"Отлично! {trainee_name} готов. Теперь у вас есть еще один человек, который может справляться с критическими задачами. Так расширяется пропускная способность ограничения."})
+
+                state.training_in_progress = None
+            else:
+                state.chat_history.append({"sender": "System", "text": f"Обучение продолжается. Осталось {state.training_in_progress['weeks_remaining']} нед."})
+
+        # Update task progress (simplified - tasks in progress may move to review)
+        # This is a basic implementation; real game would have more sophisticated progress
+        state.chat_history.append({"sender": "System", "text": f"--- Неделя {state.week} ---"})
 
     # --- Sprint Action Handlers ---
 
