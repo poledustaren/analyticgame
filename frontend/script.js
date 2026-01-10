@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sprintBtn = document.getElementById('sprint-btn');
     const sprintPhasesBar = document.getElementById('sprint-phases-bar');
     const sprintGoalText = document.getElementById('sprint-goal-text');
+    const standupBtn = document.getElementById('standup-btn');
     // Metrics
     const metricBudget = document.getElementById('metric-budget');
     const metricStability = document.getElementById('metric-stability');
@@ -59,6 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Sprint Event Listeners
         sprintBtn.onclick = handleSprintButtonClick;
+        standupBtn.onclick = handleStandupClick;
 
         // Modal Event Listeners
         planningClose.onclick = closePlanningModal;
@@ -222,6 +224,13 @@ document.addEventListener('DOMContentLoaded', () => {
             // Retro modal should be open
             sprintBtn.textContent = 'In Retro';
             sprintBtn.className = 'sprint-btn secondary';
+        }
+
+        // Show/hide Daily Standup button
+        if (state.daily_standup_available && sprint.phase === 'active') {
+            standupBtn.style.display = 'block';
+        } else {
+            standupBtn.style.display = 'none';
         }
     }
 
@@ -455,6 +464,10 @@ document.addEventListener('DOMContentLoaded', () => {
             // End sprint - go to review
             sendAction({ type: 'sprint_end' });
         }
+    }
+
+    function handleStandupClick() {
+        sendAction({ type: 'standup_trigger' });
     }
 
     function openPlanningModal() {

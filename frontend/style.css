@@ -456,6 +456,24 @@ body {
     background: var(--border-color);
 }
 
+.standup-btn {
+    width: 100%;
+    padding: 8px;
+    background: var(--accent-warning);
+    border: none;
+    border-radius: 4px;
+    color: #1e293b;
+    font-weight: 600;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 8px;
+}
+
+.standup-btn:hover {
+    background: #d97706;
+}
+
 /* --- SPRINT PHASES BAR --- */
 .sprint-phases-bar {
     display: flex;

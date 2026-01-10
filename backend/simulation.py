@@ -96,6 +96,11 @@ class GameState:
         self.velocity_history = []  # Track velocity across sprints
         self.sprint_counter = 1
 
+        # Daily Standup System
+        self.daily_standup_available = False  # Can trigger standup
+        self.standup_count = 0
+        self.last_standup_week = 0
+
     def to_dict(self):
         data = self.__dict__.copy()
         if self.current_sprint:
@@ -209,6 +214,8 @@ class SimulationEngine:
         elif action_type == 'sprint_remove_task': self._handle_sprint_remove_task(action)
         elif action_type == 'sprint_end': self._handle_sprint_end(action)
         elif action_type == 'sprint_complete_retro': self._handle_sprint_complete_retro(action)
+        # Standup actions
+        elif action_type == 'standup_trigger': self._handle_standup_trigger(action)
 
         self._check_level_transition()
         return self.active_game_state.to_dict()
@@ -390,6 +397,9 @@ class SimulationEngine:
         state.current_sprint.start_time = datetime.now()
         state.current_sprint.current_week = 1
 
+        # Enable Daily Standup
+        state.daily_standup_available = True
+
         # Calculate planned velocity
         planned_points = 0
         for task_id in state.current_sprint.task_ids:
@@ -469,5 +479,66 @@ class SimulationEngine:
 
         state.chat_history.append({"sender": "System", "text": f"Sprint {completed_sprint_id} завершен. Готовы к новому циклу!"})
         state.mentor_log.append({"sender": "Эрик", "text": "Ретроспектива завершена. Что вы улучшите в следующем спринте?"})
+
+    def _handle_standup_trigger(self, action):
+        """Обрабатывает Daily Standup."""
+        state = self.active_game_state
+
+        # Only allow standup during active sprint
+        if not state.current_sprint or state.current_sprint.phase != SprintPhase.ACTIVE:
+            state.chat_history.append({"sender": "System", "text": "Daily Standup доступен только во время активного спринта."})
+            return
+
+        # Increment standup counter
+        state.standup_count += 1
+        state.last_standup_week = state.current_sprint.current_week
+
+        # Generate standup updates from team members based on their tasks
+        in_progress_tasks = state.tasks.get('in_progress', [])
+
+        # Brent's update
+        brent_task = next((t for t in in_progress_tasks if t.get('assigned_resource') == 'brent'), None)
+        if brent_task:
+            state.chat_history.append({
+                "sender": "Брент",
+                "text": f"Вчера: работал над {brent_task['title']}. Сегодня: продолжу. Блокеров нет, но я единственный, кто может это сделать."
+            })
+        elif len(in_progress_tasks) > 0:
+            state.chat_history.append({
+                "sender": "Брент",
+                "text": f"Свободен. Жду назначения. В работе {len(in_progress_tasks)} задач."
+            })
+
+        # Manager's update
+        manager_blocked = len([t for t in in_progress_tasks if t.get('required_resource') and not t.get('assigned_resource')])
+        if manager_blocked > 0:
+            state.chat_history.append({
+                "sender": "Steve (Manager)",
+                "text": f"Вчера: пытался расставить ресурсы. Сегодня: {manager_blocked} задач заблокированы из-за нехватки Брента."
+            })
+        else:
+            state.chat_history.append({
+                "sender": "Steve (Manager)",
+                "text": f"Команда работает. {len(in_progress_tasks)} задач в прогрессе. Всё по плану."
+            })
+
+        # Mentor insight based on standup
+        if len(in_progress_tasks) > state.wip_limit:
+            state.mentor_log.append({
+                "sender": "Эрик",
+                "text": "Обрати внимание на Standup. Слишком много работы в прогрессе означает долгий цикл обратной связи."
+            })
+        elif manager_blocked > 0:
+            state.mentor_log.append({
+                "sender": "Эрик",
+                "text": "Standup выявил блокер. Брент — твое ограничение. Всё, что требует Брента, ждет его."
+            })
+        else:
+            state.mentor_log.append({
+                "sender": "Эрик",
+                "text": "Хороший Standup. Команда синхронизирована. Продолжай фокусироваться на завершении."
+            })
+
+        state.daily_standup_available = False
 
 engine = SimulationEngine()
