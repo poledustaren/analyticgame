@@ -15,7 +15,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const sprintBtn = document.getElementById('sprint-btn');
     const sprintPhasesBar = document.getElementById('sprint-phases-bar');
     const sprintGoalText = document.getElementById('sprint-goal-text');
-    const standupBtn = document.getElementById('standup-btn');
     // Metrics
     const metricBudget = document.getElementById('metric-budget');
     const metricStability = document.getElementById('metric-stability');
@@ -47,119 +46,166 @@ document.addEventListener('DOMContentLoaded', () => {
     const reviewToRetroBtn = document.getElementById('review-to-retro');
     const retroModal = document.getElementById('retro-modal');
     const retroCompleteBtn = document.getElementById('retro-complete');
-    // Planning Poker Elements
-    const pokerModal = document.getElementById('poker-modal');
-    const pokerClose = document.getElementById('poker-close');
-    const pokerCancel = document.getElementById('poker-cancel');
-    const pokerApply = document.getElementById('poker-apply');
-    const pokerTaskTitle = document.getElementById('poker-task-title');
-    const pokerTaskDesc = document.getElementById('poker-task-desc');
-    const pokerCards = document.getElementById('poker-cards');
-    const pokerResults = document.getElementById('poker-results');
-    const pokerVotesDisplay = document.getElementById('poker-votes-display');
-    const pokerConsensus = document.getElementById('poker-consensus');
-    const pokerFinalValue = document.getElementById('poker-final-value');
-    // Quiz Elements
-    const quizModal = document.getElementById('quiz-modal');
-    const quizClose = document.getElementById('quiz-close');
-    const quizCancel = document.getElementById('quiz-cancel');
-    const quizNext = document.getElementById('quiz-next');
-    const quizScore = document.getElementById('quiz-score');
-    const quizTotal = document.getElementById('quiz-total');
-    const quizRemaining = document.getElementById('quiz-remaining');
-    const quizQuestion = document.getElementById('quiz-question');
-    const quizOptions = document.getElementById('quiz-options');
-    const quizQuestionContainer = document.getElementById('quiz-question-container');
-    const quizResult = document.getElementById('quiz-result');
-    const quizResultTitle = document.getElementById('quiz-result-title');
-    const quizExplanation = document.getElementById('quiz-explanation');
-
-    // --- Tutorial Elements ---
-    const tutorialModal = document.getElementById('tutorial-modal');
-    const tutorialTitle = document.getElementById('tutorial-title');
-    const tutorialStepContent = document.getElementById('tutorial-step-content');
-    const tutorialStepIndicator = document.getElementById('tutorial-step-indicator');
-    const tutorialPrevBtn = document.getElementById('tutorial-prev');
-    const tutorialNextBtn = document.getElementById('tutorial-next');
-    const tutorialSkipBtn = document.getElementById('tutorial-skip');
-    const tutorialSpotlight = document.getElementById('tutorial-spotlight');
-    const tutorialHighlightOverlay = document.getElementById('tutorial-highlight-overlay');
+    // Progress Indicators
+    const levelProgressBar = document.getElementById('level-progress-bar');
+    const levelProgressText = document.getElementById('level-progress-text');
+    const achievementsContainer = document.getElementById('achievements-container');
+    const toastContainer = document.getElementById('toast-container');
 
     // --- State Management ---
     let currentState = null;
     let planningSprintTasks = []; // Tasks selected during planning
-    let tutorialCurrentStep = 0;
-    let currentPokerTask = null; // Task currently being estimated with Planning Poker
+    let earnedAchievements = new Set(); // Track earned achievements
 
-    // --- Tutorial Steps Configuration ---
-    const tutorialSteps = [
-        {
-            title: "Welcome to Phoenix Simulator! \ud83c\udf15",
-            icon: "\ud83d\udcb0",
-            content: `<h3>Welcome, Operations Lead!</h3>
-                <p>You've been tasked with saving Parts Unlimited from disaster. Your goal: stabilize the IT operations and deliver the Phoenix Project on time.</p>
-                <p>This tutorial will guide you through the basics of managing your workflow using Kanban and Agile principles.</p>`,
-            target: null,
-            position: 'center'
-        },
-        {
-            title: "Your Resources \ud83d\udc65",
-            icon: "\ud83d\udc65",
-            content: `<h3>Brent is your key resource</h3>
-                <p>Brent (and other resources) appears here. Some tasks <strong>require Brent</strong> to be completed - they'll show a "NEEDS BRENT" badge.</p>
-                <p>Drag Brent's avatar to tasks that need him to unblock work.</p>`,
-            target: '#resource-pool',
-            position: 'right'
-        },
-        {
-            title: "The Sprint \ud83d\udccb",
-            icon: "\ud83d\udccb",
-            content: `<h3>Work in Sprints</h3>
-                <p>Sprints help you focus on delivering value in fixed timeboxes. Click "Start Sprint" to begin planning.</p>
-                <p>During planning, select tasks from the backlog and set a sprint goal.</p>`,
-            target: '#sprint-btn',
-            position: 'right'
-        },
-        {
-            title: "Kanban Board \ud83d\udccb",
-            icon: "\ud83d\udccb",
-            content: `<h3>Visualize Your Work</h3>
-                <p>This is your Kanban board. Drag tasks between columns to progress them:</p>
-                <ul style="margin-left: 20px; color: #94a3b8;">
-                    <li><strong>BACKLOG</strong> - Tasks to do</li>
-                    <li><strong>IN PROGRESS</strong> - Currently working</li>
-                    <li><strong>REVIEW</strong> - Under review</li>
-                    <li><strong>DONE</strong> - Completed!</li>
-                </ul>
-                <p style="margin-top: 8px;">Watch your WIP limit - don't overload the system!</p>`,
-            target: '#board-container',
-            position: 'left'
-        },
-        {
-            title: "Mentor Guidance \ud83d\udc68\u200d\ud83d\udcbb",
-            icon: "\ud83d\udc68\u200d\ud83d\udcbb",
-            content: `<h3>Erik is here to help</h3>
-                <p>Erik Reid will provide guidance and tips in the Mentor panel. Pay attention to his advice - he knows the way!</p>
-                <p>The Team Chat shows communications from your team members.</p>`,
-            target: '#right-panel',
-            position: 'left'
-        },
-        {
-            title: "Ready to Start! \ud83d\ude80",
-            icon: "\ud83d\ude80",
-            content: `<h3>You're all set!</h3>
-                <p>Remember these key principles:</p>
-                <ul style="margin-left: 20px; color: #94a3b8;">
-                    <li>Limit WIP to improve flow</li>
-                    <li>Assign Brent to blocked tasks</li>
-                    <li>Complete sprints to build velocity</li>
-                    <li>Keep unplanned work low!</li>
-                </ul>
-                <p style="margin-top: 8px;">Good luck, Operations Lead. The fate of Parts Unlimited is in your hands!</p>`,
-            target: null,
-            position: 'center'
+    // --- Toast Notification System ---
+    const toastIcons = {
+        success: '✓',
+        warning: '⚠',
+        error: '✕',
+        info: 'ℹ',
+        'level-up': '🎉',
+        'task-complete': '✅',
+        'sprint-start': '🚀',
+        'sprint-end': '🏁',
+        'achievement': '🏆'
+    };
+
+    function showToast(title, message, type = 'info', duration = 4000) {
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+
+        toast.innerHTML = `
+            <span class="toast-icon">${toastIcons[type] || toastIcons.info}</span>
+            <div class="toast-content">
+                <div class="toast-title">${title}</div>
+                <div class="toast-message">${message}</div>
+            </div>
+            <button class="toast-close">&times;</button>
+        `;
+
+        toastContainer.appendChild(toast);
+
+        // Auto-remove after duration
+        const timeout = setTimeout(() => removeToast(toast), duration);
+
+        // Close button handler
+        toast.querySelector('.toast-close').onclick = () => {
+            clearTimeout(timeout);
+            removeToast(toast);
+        };
+    }
+
+    function removeToast(toast) {
+        toast.classList.add('removing');
+        setTimeout(() => toast.remove(), 300);
+    }
+
+    // --- Achievement System ---
+    function addAchievement(id, icon, text, badgeClass = '') {
+        if (earnedAchievements.has(id)) return;
+
+        earnedAchievements.add(id);
+
+        // Remove "no achievements" message if present
+        const noAchievements = achievementsContainer.querySelector('.no-achievements');
+        if (noAchievements) noAchievements.remove();
+
+        const badge = document.createElement('div');
+        badge.className = `achievement-badge ${badgeClass}`;
+        badge.innerHTML = `
+            <span class="badge-icon">${icon}</span>
+            <span class="badge-text">${text}</span>
+        `;
+
+        achievementsContainer.appendChild(badge);
+
+        // Show toast for new achievement
+        showToast('Achievement Unlocked!', text, 'achievement', 5000);
+    }
+
+    function renderAchievements(state) {
+        // Check for achievements based on state
+
+        // Level completion achievement
+        if (state.level >= 2 && !earnedAchievements.has('level-1-complete')) {
+            addAchievement('level-1-complete', '🎯', 'Level 1 Complete', 'level-complete');
         }
-    ];
+        if (state.level >= 3 && !earnedAchievements.has('level-2-complete')) {
+            addAchievement('level-2-complete', '⭐', 'Level 2 Complete', 'level-complete');
+        }
+
+        // Sprint completion achievement
+        const velocityHistory = state.velocity_history || [];
+        if (velocityHistory.length >= 1 && !earnedAchievements.has('first-sprint')) {
+            addAchievement('first-sprint', '🏁', 'First Sprint', 'sprint-complete');
+        }
+        if (velocityHistory.length >= 3 && !earnedAchievements.has('sprint-veteran')) {
+            addAchievement('sprint-veteran', '🎖️', 'Sprint Veteran', 'sprint-complete');
+        }
+
+        // High velocity achievement (100% sprint completion)
+        if (velocityHistory.length > 0) {
+            const lastSprint = velocityHistory[velocityHistory.length - 1];
+            if (lastSprint.planned > 0 && lastSprint.actual >= lastSprint.planned) {
+                if (!earnedAchievements.has('perfect-sprint')) {
+                    addAchievement('perfect-sprint', '💯', 'Perfect Sprint', 'goal-complete');
+                }
+            }
+        }
+
+        // Stability achievement
+        if (state.stability >= 80 && !earnedAchievements.has('stable-team')) {
+            addAchievement('stable-team', '🛡️', 'Stable Team', 'goal-complete');
+        }
+
+        // Low unplanned work achievement
+        if (state.unplanned_work <= 20 && !earnedAchievements.has('under-control')) {
+            addAchievement('under-control', '✨', 'Under Control', 'goal-complete');
+        }
+    }
+
+    // --- Level Progress Rendering ---
+    function renderLevelProgress(state) {
+        // Determine level goal based on level
+        let current = 0;
+        let goal = 3;
+        let goalText = 'unplanned tasks';
+
+        if (state.level === 1) {
+            // Level 1: Complete 3 unplanned tasks
+            const doneTasks = state.tasks?.done || [];
+            current = doneTasks.filter(t => t.type === 'unplanned').length;
+            goal = 3;
+            goalText = 'unplanned tasks';
+        } else if (state.level === 2) {
+            // Level 2: Achieve 80% stability
+            current = Math.round(state.stability);
+            goal = 80;
+            goalText = 'stability';
+        } else {
+            // Generic: show sprint completion progress
+            const velocityHistory = state.velocity_history || [];
+            current = velocityHistory.length;
+            goal = 5;
+            goalText = 'sprints completed';
+        }
+
+        // Calculate percentage
+        const percentage = Math.min(100, Math.round((current / goal) * 100));
+
+        // Update progress bar
+        levelProgressBar.style.width = `${percentage}%`;
+        levelProgressText.textContent = `${current}/${goal}`;
+
+        // Color coding based on progress
+        if (percentage >= 100) {
+            levelProgressBar.style.background = 'var(--accent-success)';
+        } else if (percentage >= 50) {
+            levelProgressBar.style.background = 'linear-gradient(90deg, var(--accent-primary), var(--accent-success))';
+        } else {
+            levelProgressBar.style.background = 'linear-gradient(90deg, var(--accent-warning), var(--accent-primary))';
+        }
+    }
 
     // --- Initialization ---
     function init() {
@@ -169,7 +215,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Sprint Event Listeners
         sprintBtn.onclick = handleSprintButtonClick;
-        standupBtn.onclick = handleStandupClick;
 
         // Modal Event Listeners
         planningClose.onclick = closePlanningModal;
@@ -177,21 +222,6 @@ document.addEventListener('DOMContentLoaded', () => {
         planningConfirm.onclick = createSprint;
         reviewToRetroBtn.onclick = goToRetro;
         retroCompleteBtn.onclick = completeRetro;
-
-        // Tutorial Event Listeners
-        tutorialSkipBtn.onclick = endTutorial;
-        tutorialNextBtn.onclick = nextTutorialStep;
-        tutorialPrevBtn.onclick = prevTutorialStep;
-
-        // Planning Poker Event Listeners
-        pokerClose.onclick = closePokerModal;
-        pokerCancel.onclick = cancelPoker;
-        pokerApply.onclick = applyPokerEstimate;
-
-        // Quiz Event Listeners
-        quizClose.onclick = closeQuizModal;
-        quizCancel.onclick = closeQuizModal;
-        quizNext.onclick = startNextQuizQuestion;
 
         tabBtns.forEach(btn => {
             btn.addEventListener('click', () => {
@@ -214,157 +244,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`${API_BASE_URL}/new_game`, { method: 'POST' });
             const state = await response.json();
             render(state);
-
-            // Check if first run - show tutorial
-            checkFirstRun();
         } catch (error) {
             console.error("Failed to start game:", error);
         }
-    }
-
-    // --- Tutorial Functions ---
-
-    function checkFirstRun() {
-        const hasSeenTutorial = localStorage.getItem('phoenix_tutorial_completed');
-        if (!hasSeenTutorial) {
-            // Small delay to let UI render
-            setTimeout(() => startTutorial(), 500);
-        }
-    }
-
-    function startTutorial() {
-        tutorialCurrentStep = 0;
-        tutorialModal.style.display = 'flex';
-        showTutorialStep(0);
-    }
-
-    function showTutorialStep(stepIndex) {
-        const step = tutorialSteps[stepIndex];
-
-        // Update content
-        tutorialTitle.textContent = step.title;
-        tutorialStepIndicator.textContent = `${stepIndex + 1} / ${tutorialSteps.length}`;
-
-        // Build step HTML with icon
-        let html = '';
-        if (step.icon) {
-            html += `<div class="tutorial-step-icon">${step.icon}</div>`;
-        }
-        html += step.content;
-        tutorialStepContent.innerHTML = html;
-
-        // Update buttons
-        tutorialPrevBtn.style.display = stepIndex === 0 ? 'none' : 'block';
-        tutorialNextBtn.textContent = stepIndex === tutorialSteps.length - 1 ? 'Get Started!' : 'Next';
-
-        // Handle highlight
-        highlightElement(step.target, step.position);
-    }
-
-    function highlightElement(selector, position) {
-        // Clear previous highlights
-        clearHighlight();
-
-        if (!selector) {
-            // Center position, no highlight
-            positionTutorialContent('center');
-            tutorialHighlightOverlay.classList.add('active');
-            return;
-        }
-
-        const target = document.querySelector(selector);
-        if (target) {
-            const rect = target.getBoundingClientRect();
-
-            // Show overlay
-            tutorialHighlightOverlay.classList.add('active');
-
-            // Position and show spotlight
-            tutorialSpotlight.style.width = `${rect.width + 16}px`;
-            tutorialSpotlight.style.height = `${rect.height + 16}px`;
-            tutorialSpotlight.style.top = `${rect.top - 8}px`;
-            tutorialSpotlight.style.left = `${rect.left - 8}px`;
-            tutorialSpotlight.classList.add('active');
-
-            // Add pulse class to target
-            target.classList.add('tutorial-highlight-target');
-
-            // Position tutorial content near the target
-            positionTutorialContent(position, rect);
-        } else {
-            // Target not found, center the modal
-            positionTutorialContent('center');
-            tutorialHighlightOverlay.classList.add('active');
-        }
-    }
-
-    function positionTutorialContent(position, targetRect) {
-        const content = document.querySelector('.tutorial-content');
-        const margin = 20;
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-
-        // Reset positioning
-        content.style.top = '';
-        content.style.left = '';
-        content.style.right = '';
-        content.style.bottom = '';
-        content.style.transform = '';
-
-        if (position === 'center' || !targetRect) {
-            content.style.top = '50%';
-            content.style.left = '50%';
-            content.style.transform = 'translate(-50%, -50%)';
-        } else if (position === 'right') {
-            content.style.top = `${Math.min(targetRect.top, viewportHeight - 400)}px`;
-            content.style.left = `${targetRect.right + margin}px`;
-            // If too far right, move to left of target
-            if (targetRect.right + 420 > viewportWidth) {
-                content.style.left = '';
-                content.style.right = `${viewportWidth - targetRect.left + margin}px`;
-            }
-        } else if (position === 'left') {
-            content.style.top = `${Math.min(targetRect.top, viewportHeight - 400)}px`;
-            content.style.right = `${viewportWidth - targetRect.left + margin}px`;
-            // If too far left, move to right of target
-            if (targetRect.left < 420) {
-                content.style.right = '';
-                content.style.left = `${targetRect.right + margin}px`;
-            }
-        }
-    }
-
-    function clearHighlight() {
-        // Remove spotlight
-        tutorialSpotlight.classList.remove('active');
-        tutorialHighlightOverlay.classList.remove('active');
-
-        // Remove highlight class from all elements
-        document.querySelectorAll('.tutorial-highlight-target').forEach(el => {
-            el.classList.remove('tutorial-highlight-target');
-        });
-    }
-
-    function nextTutorialStep() {
-        if (tutorialCurrentStep < tutorialSteps.length - 1) {
-            tutorialCurrentStep++;
-            showTutorialStep(tutorialCurrentStep);
-        } else {
-            endTutorial();
-        }
-    }
-
-    function prevTutorialStep() {
-        if (tutorialCurrentStep > 0) {
-            tutorialCurrentStep--;
-            showTutorialStep(tutorialCurrentStep);
-        }
-    }
-
-    function endTutorial() {
-        clearHighlight();
-        tutorialModal.style.display = 'none';
-        localStorage.setItem('phoenix_tutorial_completed', 'true');
     }
 
     async function sendAction(actionData) {
@@ -375,9 +257,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(actionData),
             });
             const newState = await response.json();
+
+            // Toast notifications for specific actions
+            if (actionData.type === 'task_move' && actionData.new_column_id === 'done') {
+                showToast('Task Complete!', 'Great work! Keep it up.', 'task-complete', 3000);
+            } else if (actionData.type === 'assign_resource') {
+                showToast('Resource Assigned', 'Brent is now working on this task.', 'info', 2000);
+            } else if (actionData.type === 'sprint_complete_retro') {
+                showToast('Sprint Complete!', 'Congratulations on finishing the sprint!', 'success', 4000);
+            }
+
             render(newState);
         } catch (error) {
             console.error("Action failed:", error);
+            showToast('Action Failed', 'Could not complete the action. Please try again.', 'error', 4000);
         }
     }
 
@@ -389,7 +282,25 @@ document.addEventListener('DOMContentLoaded', () => {
     function render(state) {
         // Check for Level Change (Transition Animation placeholder)
         if (currentState && currentState.level < state.level) {
-            alert(`CONGRATULATIONS! Level ${currentState.level} Complete.\nStarting Level ${state.level}: The First Way (Flow)`);
+            showToast(
+                `Level ${currentState.level} Complete!`,
+                `Starting Level ${state.level}: ${state.level === 2 ? 'The First Way (Flow)' : 'Next Challenge'}`,
+                'level-up',
+                6000
+            );
+        }
+
+        // Check for sprint phase changes
+        if (currentState && currentState.current_sprint && state.current_sprint) {
+            if (currentState.current_sprint.phase !== state.current_sprint.phase) {
+                if (state.current_sprint.phase === 'active') {
+                    showToast('Sprint Started!', `Sprint ${state.current_sprint.id}: "${state.current_sprint.goal}"`, 'sprint-start');
+                } else if (state.current_sprint.phase === 'review') {
+                    showToast('Sprint Ended!', `Time to review Sprint ${state.current_sprint.id}`, 'sprint-end');
+                } else if (state.current_sprint.phase === 'retro') {
+                    showToast('Sprint Review Complete!', 'Let\'s reflect on what went well', 'info');
+                }
+            }
         }
 
         currentState = state;
@@ -414,6 +325,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // 2. Sprint UI
         renderSprint(state);
 
+        // 2.1 Level Progress
+        renderLevelProgress(state);
+
         // 3. Resources (Brent)
         renderResources(state.resources);
 
@@ -426,15 +340,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // 6. Velocity Chart
         renderVelocity(state.velocity_history || []);
 
-        // 7. Planning Poker
-        if (state.planning_poker) {
-            renderPokerModal(state.planning_poker);
-        }
-
-        // 8. Quiz
-        if (state.quiz) {
-            updateQuizUI(state.quiz);
-        }
+        // 7. Achievements
+        renderAchievements(state);
     }
 
     // --- Sprint Rendering ---
@@ -506,13 +413,6 @@ document.addEventListener('DOMContentLoaded', () => {
             // Retro modal should be open
             sprintBtn.textContent = 'In Retro';
             sprintBtn.className = 'sprint-btn secondary';
-        }
-
-        // Show/hide Daily Standup button
-        if (state.daily_standup_available && sprint.phase === 'active') {
-            standupBtn.style.display = 'block';
-        } else {
-            standupBtn.style.display = 'none';
         }
     }
 
@@ -618,7 +518,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span>${task.points} pts</span>
                         ${resourceSlotHtml}
                     </div>
-                    <button class="poker-btn" data-task-id="${task.id}" data-task-title="${task.title}" data-task-desc="${task.description || ''}">🎴 Planning Poker</button>
                 `;
 
                 if (isResourceNeeded && !assignedResId) {
@@ -689,6 +588,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     const taskId = draggedElement.dataset.taskId;
                     const oldColId = draggedElement.dataset.colId;
 
+                    // WIP Limit check for in_progress column
+                    if (newColId === 'in_progress' && currentState) {
+                        const currentWip = currentState.tasks?.in_progress?.length || 0;
+                        const wipLimit = currentState.wip_limit || 3;
+                        if (currentWip >= wipLimit) {
+                            showToast('WIP Limit Reached!', `Maximum ${wipLimit} tasks allowed in progress.`, 'warning', 4000);
+                            return;
+                        }
+                    }
+
                     // Optimization: Don't send request if dropping in same column
                     if (newColId !== oldColId) {
                         sendAction({
@@ -747,10 +656,6 @@ document.addEventListener('DOMContentLoaded', () => {
             // End sprint - go to review
             sendAction({ type: 'sprint_end' });
         }
-    }
-
-    function handleStandupClick() {
-        sendAction({ type: 'standup_trigger' });
     }
 
     function openPlanningModal() {
@@ -928,196 +833,6 @@ document.addEventListener('DOMContentLoaded', () => {
             notes: notes
         });
     }
-
-    // --- Planning Poker Functions ---
-
-    function renderPokerModal(pokerState) {
-        // Set task info
-        pokerTaskTitle.textContent = pokerState.task_title;
-        pokerTaskDesc.textContent = currentPokerTask?.description || 'Estimate this task...';
-
-        // Render cards
-        pokerCards.innerHTML = pokerState.cards.map(card => `
-            <div class="poker-card" data-vote="${card}">
-                <span class="poker-card-value">${card}</span>
-            </div>
-        `).join('');
-
-        // Add click handlers to cards
-        pokerCards.querySelectorAll('.poker-card').forEach(cardEl => {
-            cardEl.onclick = () => {
-                const vote = parseInt(cardEl.dataset.vote);
-                submitPokerVote(vote);
-            };
-        });
-
-        // Show modal
-        if (pokerModal.style.display !== 'flex') {
-            pokerModal.style.display = 'flex';
-        }
-
-        // Show results if votes exist
-        if (pokerState.ai_votes && Object.keys(pokerState.ai_votes).length > 0) {
-            pokerResults.style.display = 'block';
-            renderPokerVotes(pokerState);
-        } else {
-            pokerResults.style.display = 'none';
-        }
-
-        // Show consensus if reached
-        if (pokerState.consensus_reached) {
-            pokerConsensus.style.display = 'block';
-            pokerFinalValue.textContent = pokerState.final_estimate;
-            pokerApply.style.display = 'inline-block';
-            // Disable card clicking after consensus
-            pokerCards.querySelectorAll('.poker-card').forEach(c => c.style.pointerEvents = 'none');
-        } else {
-            pokerConsensus.style.display = 'none';
-            pokerApply.style.display = 'none';
-            pokerCards.querySelectorAll('.poker-card').forEach(c => c.style.pointerEvents = 'auto');
-        }
-    }
-
-    function renderPokerVotes(pokerState) {
-        let html = '';
-
-        // Player vote
-        if (pokerState.player_vote !== null) {
-            html += `<div class="poker-vote-item player">
-                <span class="vote-name">Вы</span>
-                <span class="vote-value">${pokerState.player_vote}</span>
-            </div>`;
-        }
-
-        // AI votes
-        for (const [id, member] of Object.entries(pokerState.ai_votes)) {
-            html += `<div class="poker-vote-item">
-                <span class="vote-name">${member.name}</span>
-                <span class="vote-value">${member.vote}</span>
-            </div>`;
-        }
-
-        pokerVotesDisplay.innerHTML = html;
-    }
-
-    async function submitPokerVote(vote) {
-        await sendAction({
-            type: 'poker_vote',
-            vote: vote
-        });
-    }
-
-    async function applyPokerEstimate() {
-        await sendAction({ type: 'poker_apply' });
-        closePokerModal();
-    }
-
-    async function cancelPoker() {
-        await sendAction({ type: 'poker_cancel' });
-        closePokerModal();
-    }
-
-    function closePokerModal() {
-        pokerModal.style.display = 'none';
-        currentPokerTask = null;
-    }
-
-    // Add event delegation for Planning Poker buttons on task cards
-    document.addEventListener('click', (e) => {
-        if (e.target.classList.contains('poker-btn')) {
-            e.stopPropagation();
-            const taskId = e.target.dataset.taskId;
-            const taskTitle = e.target.dataset.taskTitle;
-            const taskDesc = e.target.dataset.taskDesc;
-
-            // Find the full task object
-            for (const col of Object.values(currentState?.tasks || {})) {
-                const task = col.find(t => t.id === taskId);
-                if (task) {
-                    currentPokerTask = task;
-                    break;
-                }
-            }
-
-            // Start Planning Poker session
-            sendAction({
-                type: 'poker_start',
-                task_id: taskId
-            });
-        }
-    });
-
-    // --- Quiz Functions ---
-
-    function updateQuizUI(quizState) {
-        // Update score display
-        quizScore.textContent = quizState.score || 0;
-        quizTotal.textContent = quizState.total_answered || 0;
-        quizRemaining.textContent = quizState.remaining || 8;
-
-        // If there's an active question, show it
-        if (quizState.current_question) {
-            showQuizQuestion(quizState.current_question);
-        }
-    }
-
-    function showQuizQuestion(question) {
-        quizModal.style.display = 'flex';
-        quizQuestion.textContent = question.question;
-        quizQuestionContainer.style.display = 'block';
-        quizResult.style.display = 'none';
-        quizNext.style.display = 'none';
-
-        // Render options
-        quizOptions.innerHTML = question.options.map((option, index) => `
-            <button class="quiz-option-btn" data-index="${index}">
-                <span class="quiz-option-letter">${String.fromCharCode(65 + index)}</span>
-                <span class="quiz-option-text">${option}</span>
-            </button>
-        `).join('');
-
-        // Add click handlers
-        quizOptions.querySelectorAll('.quiz-option-btn').forEach(btn => {
-            btn.onclick = () => {
-                const answerIndex = parseInt(btn.dataset.index);
-                submitQuizAnswer(answerIndex);
-            };
-        });
-    }
-
-    async function submitQuizAnswer(answerIndex) {
-        await sendAction({
-            type: 'quiz_submit_answer',
-            answer_index: answerIndex
-        });
-    }
-
-    async function startNextQuizQuestion() {
-        await sendAction({ type: 'quiz_start' });
-    }
-
-    function closeQuizModal() {
-        quizModal.style.display = 'none';
-    }
-
-    // Add quiz start button to mentor panel
-    function addQuizButtonToMentor() {
-        const mentorTab = document.getElementById('mentor-tab');
-        if (!mentorTab || document.getElementById('start-quiz-btn')) return;
-
-        const quizBtn = document.createElement('button');
-        quizBtn.id = 'start-quiz-btn';
-        quizBtn.className = 'quiz-start-btn';
-        quizBtn.textContent = '🧠 Start Quiz';
-        quizBtn.onclick = async () => {
-            await sendAction({ type: 'quiz_start' });
-        };
-
-        mentorTab.insertBefore(quizBtn, mentorTab.querySelector('.log-scroll'));
-    }
-
-    // Add quiz button after initial render
-    setTimeout(addQuizButtonToMentor, 500);
 
     init();
 });
