@@ -49,6 +49,7 @@
             <div class="sidebar-menu">
                 <button id="new-game-btn" class="menu-btn">Restart Level</button>
                 <button id="save-game-btn" class="menu-btn">Save Progress</button>
+                <button id="debug-minigames-btn" class="menu-btn" style="border-color: var(--accent-warning); color: var(--accent-warning);">🎮 Test Minigames</button>
             </div>
         </aside>
 
@@ -272,6 +273,111 @@
             </div>
             <div class="modal-footer">
                 <button class="modal-btn primary" id="retro-complete">Complete Sprint</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- BRENT RESCUE MINIGAME MODAL -->
+    <div id="brent-rescue-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content minigame-modal brent-rescue-modal">
+            <div class="modal-header">
+                <h2>🚀 Brent Rescue: Knowledge Sharing</h2>
+                <button class="modal-close" id="brent-rescue-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="minigame-instruction">Перетащите знания Брента на разработчиков, чтобы снизить зависимость от него.</p>
+                <div class="minigame-timer" id="brent-rescue-timer">60s</div>
+                <div class="brent-rescue-game">
+                    <div class="knowledge-pool">
+                        <h4>📚 Знания Брента</h4>
+                        <div id="knowledge-items" class="knowledge-items"></div>
+                    </div>
+                    <div class="developers-target">
+                        <h4>👥 Команда разработки</h4>
+                        <div id="developer-slots" class="developer-slots"></div>
+                    </div>
+                </div>
+                <div class="minigame-score">Каждый разработчик должен получить 3 знания</div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn secondary" id="brent-rescue-skip">Пропустить</button>
+                <button class="modal-btn primary" id="brent-rescue-submit">Готово</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FLOW OPTIMIZATION MINIGAME MODAL -->
+    <div id="flow-optimization-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content minigame-modal flow-optimization-modal">
+            <div class="modal-header">
+                <h2>⚡ Flow Optimization: WIP Limits</h2>
+                <button class="modal-close" id="flow-optimization-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="minigame-instruction">Установите правильные WIP-лимиты для каждого этапа, чтобы улучшить поток.</p>
+                <div class="flow-stages">
+                    <div id="flow-stage-sliders" class="flow-stage-sliders"></div>
+                </div>
+                <div class="flow-preview">
+                    <div class="flow-visualization">
+                        <div class="flow-stage" data-stage="backlog">
+                            <span class="flow-label">Backlog</span>
+                            <div class="flow-wip"><span class="flow-current">8</span>/<span class="flow-limit" id="limit-backlog">10</span></div>
+                        </div>
+                        <div class="flow-arrow">→</div>
+                        <div class="flow-stage" data-stage="in_progress">
+                            <span class="flow-label">In Progress</span>
+                            <div class="flow-wip"><span class="flow-current">6</span>/<span class="flow-limit" id="limit-in_progress">3</span></div>
+                        </div>
+                        <div class="flow-arrow">→</div>
+                        <div class="flow-stage" data-stage="review">
+                            <span class="flow-label">Review</span>
+                            <div class="flow-wip"><span class="flow-current">4</span>/<span class="flow-limit" id="limit-review">2</span></div>
+                        </div>
+                        <div class="flow-arrow">→</div>
+                        <div class="flow-stage" data-stage="deploy">
+                            <span class="flow-label">Deploy</span>
+                            <div class="flow-wip"><span class="flow-current">2</span>/<span class="flow-limit" id="limit-deploy">2</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn secondary" id="flow-optimization-skip">Пропустить</button>
+                <button class="modal-btn primary" id="flow-optimization-submit">Применить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FIREFIGHTING MINIGAME MODAL -->
+    <div id="firefighting-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content minigame-modal firefighting-modal">
+            <div class="modal-header">
+                <h2>🔥 Firefighting: Incident Priority</h2>
+                <button class="modal-close" id="firefighting-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="minigame-instruction">Перетащите инциденты для сортировки по приоритету (сверху вниз: самый критичный).</p>
+                <div class="firefighting-game">
+                    <div class="incidents-pool" id="incidents-pool">
+                        <h4>📋 Инциденты (перетащите вправо)</h4>
+                        <div id="incident-cards" class="incident-cards"></div>
+                    </div>
+                    <div class="incidents-priority-list">
+                        <h4>🎯 Очередь приоритета</h4>
+                        <div id="priority-queue" class="priority-queue">
+                            <div class="priority-slot" data-rank="1">1. Критический</div>
+                            <div class="priority-slot" data-rank="2">2. Высокий</div>
+                            <div class="priority-slot" data-rank="3">3. Средний</div>
+                            <div class="priority-slot" data-rank="4">4. Низкий</div>
+                            <div class="priority-slot" data-rank="5">5. Низший</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn secondary" id="firefighting-skip">Пропустить</button>
+                <button class="modal-btn primary" id="firefighting-submit">Проверить</button>
             </div>
         </div>
     </div>

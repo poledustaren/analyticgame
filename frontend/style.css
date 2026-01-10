@@ -851,3 +851,369 @@ body {
     outline: none;
     border-color: var(--accent-primary);
 }
+
+/* --- MINIGAME MODALS --- */
+.minigame-modal {
+    max-width: 800px;
+}
+
+.minigame-modal .modal-header h2 {
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.minigame-instruction {
+    color: var(--text-secondary);
+    font-size: 13px;
+    margin-bottom: 16px;
+    text-align: center;
+}
+
+.minigame-timer {
+    text-align: center;
+    font-size: 24px;
+    font-weight: bold;
+    color: var(--accent-warning);
+    margin-bottom: 16px;
+}
+
+/* BRENT RESCUE */
+.brent-rescue-modal {
+    max-width: 700px;
+}
+
+.brent-rescue-game {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.knowledge-pool h4,
+.developers-target h4 {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+}
+
+.knowledge-items {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 150px;
+    background: var(--bg-dark);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.knowledge-item {
+    background: linear-gradient(135deg, var(--card-knowledge), #ea580c);
+    border-radius: 6px;
+    padding: 10px 14px;
+    cursor: grab;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: white;
+    user-select: none;
+    transition: transform 0.2s;
+}
+
+.knowledge-item:hover {
+    transform: translateX(4px);
+}
+
+.knowledge-item:active {
+    cursor: grabbing;
+}
+
+.knowledge-item.dragging {
+    opacity: 0.5;
+}
+
+.developer-slots {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.developer-slot {
+    background: var(--bg-dark);
+    border: 2px dashed var(--border-color);
+    border-radius: 8px;
+    padding: 12px;
+    min-height: 60px;
+    transition: all 0.3s;
+}
+
+.developer-slot.drag-over {
+    border-color: var(--card-knowledge);
+    background: rgba(249, 115, 22, 0.1);
+}
+
+.developer-slot-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.developer-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--accent-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.developer-name {
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.developer-knowledge {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.developer-knowledge .knowledge-item {
+    padding: 6px 10px;
+    font-size: 11px;
+}
+
+.minigame-score {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 12px;
+    margin-top: 12px;
+}
+
+/* FLOW OPTIMIZATION */
+.flow-optimization-modal {
+    max-width: 650px;
+}
+
+.flow-stage-sliders {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.flow-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+}
+
+.flow-slider-label {
+    width: 100px;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.flow-slider {
+    flex: 1;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--bg-card);
+    outline: none;
+    -webkit-appearance: none;
+}
+
+.flow-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent-primary);
+    cursor: pointer;
+}
+
+.flow-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent-primary);
+    cursor: pointer;
+    border: none;
+}
+
+.flow-slider-value {
+    width: 40px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent-primary);
+}
+
+.flow-preview {
+    background: var(--bg-dark);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.flow-visualization {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    gap: 8px;
+}
+
+.flow-stage {
+    text-align: center;
+    padding: 12px;
+    background: var(--bg-card);
+    border-radius: 6px;
+    min-width: 80px;
+}
+
+.flow-label {
+    display: block;
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.flow-wip {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.flow-wip .flow-current {
+    color: var(--text-primary);
+}
+
+.flow-wip .flow-limit {
+    color: var(--accent-primary);
+}
+
+.flow-arrow {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+/* FIREFIGHTING */
+.firefighting-modal {
+    max-width: 750px;
+}
+
+.firefighting-game {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.incidents-pool h4,
+.incidents-priority-list h4 {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+}
+
+.incident-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 250px;
+    background: var(--bg-dark);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.incident-card {
+    background: var(--bg-card);
+    border-left: 4px solid var(--accent-danger);
+    border-radius: 4px;
+    padding: 12px;
+    cursor: grab;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.incident-card:hover {
+    transform: translateX(4px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.incident-card:active {
+    cursor: grabbing;
+}
+
+.incident-card.dragging {
+    opacity: 0.5;
+}
+
+.incident-card.critical {
+    border-left-color: #ef4444;
+}
+
+.incident-card.high {
+    border-left-color: #f97316;
+}
+
+.incident-card.medium {
+    border-left-color: #eab308;
+}
+
+.incident-card.low {
+    border-left-color: #84cc16;
+}
+
+.incident-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.incident-description {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.priority-queue {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.priority-slot {
+    background: var(--bg-dark);
+    border: 2px dashed var(--border-color);
+    border-radius: 6px;
+    padding: 8px 12px;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.priority-slot.drag-over {
+    border-color: var(--accent-danger);
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.priority-slot.has-incident {
+    border-style: solid;
+    border-color: var(--accent-success);
+    background: rgba(34, 197, 94, 0.1);
+}
+
+.priority-slot .rank-label {
+    flex-shrink: 0;
+    font-weight: 600;
+}
+
+.priority-slot .incident-placeholder {
+    color: var(--text-secondary);
+    font-style: italic;
+}

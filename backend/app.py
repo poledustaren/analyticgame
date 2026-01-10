@@ -52,6 +52,22 @@ def handle_action():
     return jsonify(new_state)
 
 
+# --- Debug API для тестирования минигеймов ---
+
+@app.route('/api/debug/start_minigame', methods=['POST'])
+def debug_start_minigame():
+    """Запускает указанный минигейм для тестирования."""
+    if not engine.active_game_state:
+        return jsonify({"error": "Нет активной игры"}), 400
+
+    minigame_type = request.json.get('minigame_type')
+    if not minigame_type:
+        return jsonify({"error": "minigame_type is required"}), 400
+
+    engine.process_action({'type': 'minigame_start', 'minigame_type': minigame_type})
+    return jsonify(engine.get_current_state())
+
+
 # --- Маршрут для обслуживания фронтенда ---
 
 @app.route('/')

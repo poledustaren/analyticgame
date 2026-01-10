@@ -77,7 +77,10 @@ class GameState:
 
         # Resources (Brent, Developers, etc.)
         self.resources = [
-            {"id": "brent", "name": "Брент", "role": "Lead Engineer", "avatar": "brent_avatar.png", "busy_task_id": None}
+            {"id": "brent", "name": "Брент", "role": "Lead Engineer", "avatar": "brent_avatar.png", "busy_task_id": None},
+            {"id": "dev1", "name": "Алекс", "role": "Developer", "avatar": "dev1_avatar.png", "busy_task_id": None, "knowledge": 0},
+            {"id": "dev2", "name": "Мария", "role": "Developer", "avatar": "dev2_avatar.png", "busy_task_id": None, "knowledge": 0},
+            {"id": "dev3", "name": "Джон", "role": "Developer", "avatar": "dev3_avatar.png", "busy_task_id": None, "knowledge": 0}
         ]
 
         # Tasks Structure
@@ -95,6 +98,11 @@ class GameState:
         self.sprint_history = []
         self.velocity_history = []  # Track velocity across sprints
         self.sprint_counter = 1
+
+        # Minigame System
+        self.active_minigame = None  # 'brent_rescue', 'flow_optimization', 'firefighting'
+        self.minigame_data = {}  # Store minigame-specific data
+        self.minigames_completed = []  # Track completed minigames
 
     def to_dict(self):
         data = self.__dict__.copy()
@@ -202,6 +210,7 @@ class SimulationEngine:
         elif action_type == 'set_wip_limit': self._handle_set_wip_limit(action)
         elif action_type == 'minigame_result': self._handle_minigame_result(action)
         elif action_type == 'assign_resource': self._handle_assign_resource(action)
+        elif action_type == 'minigame_start': self._handle_minigame_start(action)
         # Sprint actions
         elif action_type == 'sprint_create': self._handle_sprint_create(action)
         elif action_type == 'sprint_start': self._handle_sprint_start(action)
@@ -211,6 +220,7 @@ class SimulationEngine:
         elif action_type == 'sprint_complete_retro': self._handle_sprint_complete_retro(action)
 
         self._check_level_transition()
+        self._check_minigame_triggers()
         return self.active_game_state.to_dict()
 
     def _initialize_level_1(self):
@@ -351,7 +361,128 @@ class SimulationEngine:
         if isinstance(limit, int) and limit > 0: self.active_game_state.wip_limit = limit
 
     def _handle_minigame_result(self, action):
-        pass
+        """Обрабатывает результаты прохождения минигейма."""
+        state = self.active_game_state
+        minigame_type = action.get('minigame_type')
+        success = action.get('success', False)
+        score = action.get('score', 0)
+
+        if success:
+            state.minigames_completed.append(minigame_type)
+            state.budget += 5000  # Bonus for completing minigame
+            state.chat_history.append({"sender": "System", "text": f"Минигейм '{minigame_type}' пройден! Бонус: $5000"})
+            state.mentor_log.append({"sender": "Эрик", "text": self._get_minigame_success_message(minigame_type)})
+        else:
+            state.chat_history.append({"sender": "System", "text": f"Минигейм '{minigame_type}' не пройден. Попробуйте снова!"})
+
+        state.active_minigame = None
+        state.minigame_data = {}
+
+    def _handle_minigame_start(self, action):
+        """Запускает указанный минигейм."""
+        state = self.active_game_state
+        minigame_type = action.get('minigame_type')
+
+        if minigame_type == 'brent_rescue':
+            self._start_brent_rescue_minigame()
+        elif minigame_type == 'flow_optimization':
+            self._start_flow_optimization_minigame()
+        elif minigame_type == 'firefighting':
+            self._start_firefighting_minigame()
+
+    def _get_minigame_success_message(self, minigame_type):
+        messages = {
+            'brent_rescue': "Отлично! Вы разделили знания Брента с командой. Теперь он не единственное узкое место.",
+            'flow_optimization': "Правильно! WIP-лимиты помогают увидеть bottlenecks и улучшить поток.",
+            'firefighting': "Хорошо! Приоритизация критична. Нельзя тушить все пожары одновременно."
+        }
+        return messages.get(minigame_type, "Минигейм пройден!")
+
+    def _start_brent_rescue_minigame(self):
+        """Запускает минигейм Brent Rescue - распределение знаний."""
+        state = self.active_game_state
+        state.active_minigame = 'brent_rescue'
+
+        # Knowledge items that need to be distributed to developers
+        knowledge_items = [
+            {"id": "k1", "title": "Знание о payroll-системе", "icon": "💰"},
+            {"id": "k2", "title": "Знание о database-схеме", "icon": "🗄️"},
+            {"id": "k3", "title": "Знание о security-аутентификации", "icon": "🔐"},
+            {"id": "k4", "title": "Знание о API-интеграции", "icon": "🔌"},
+            {"id": "k5", "title": "Знание о мониторинге", "icon": "📊"}
+        ]
+
+        state.minigame_data = {
+            'knowledge_items': knowledge_items,
+            'target_knowledge': 3,  # Each dev needs 3 knowledge items
+            'time_limit': 60  # seconds
+        }
+
+        state.chat_history.append({"sender": "System", "text": "Минигейм: Brent Rescue! Перетащите знания на разработчиков."})
+
+    def _start_flow_optimization_minigame(self):
+        """Запускает минигейм Flow Optimization - настройка WIP лимитов."""
+        state = self.active_game_state
+        state.active_minigame = 'flow_optimization'
+
+        # Simulated workflow stages with current bottlenecks
+        stages = [
+            {"id": "backlog", "name": "Backlog", "current_wip": 8, "optimal_limit": 10},
+            {"id": "in_progress", "name": "In Progress", "current_wip": 6, "optimal_limit": 3},
+            {"id": "review", "name": "Review", "current_wip": 4, "optimal_limit": 2},
+            {"id": "deploy", "name": "Deploy", "current_wip": 2, "optimal_limit": 2}
+        ]
+
+        state.minigame_data = {
+            'stages': stages,
+            'target': 'Установите правильные WIP-лимиты для каждого этапа'
+        }
+
+        state.chat_history.append({"sender": "System", "text": "Минигейм: Flow Optimization! Настройте WIP-лимиты."})
+
+    def _start_firefighting_minigame(self):
+        """Запускает минигейм Firefighting - сортировка инцидентов по приоритету."""
+        state = self.active_game_state
+        state.active_minigame = 'firefighting'
+
+        # Incidents that need to be prioritized
+        incidents = [
+            {"id": "i1", "title": "Production is DOWN", "severity": "critical", "correct_order": 1, "description": "Все пользователи не могут доступа"},
+            {"id": "i2", "title": "Database replication lag", "severity": "high", "correct_order": 2, "description": "Репликация отстает на 2 часа"},
+            {"id": "i3", "title": "Login slow for some users", "severity": "medium", "correct_order": 3, "description": "10% пользователей жалуются"},
+            {"id": "i4", "title": "Dashboard widget misaligned", "severity": "low", "correct_order": 4, "description": "Косметическая проблема"},
+            {"id": "i5", "title": "Update footer text", "severity": "low", "correct_order": 5, "description": "Юридический отдел требует"}
+        ]
+
+        state.minigame_data = {
+            'incidents': incidents,
+            'target': 'Расположите инциденты в правильном порядке приоритета'
+        }
+
+        state.chat_history.append({"sender": "System", "text": "Минигейм: Firefighting! Сортируйте инциденты по приоритету."})
+
+    def _check_minigame_triggers(self):
+        """Проверяет, следует ли запустить минигейм."""
+        state = self.active_game_state
+
+        # Trigger Brent Rescue after completing 3 tasks with Brent
+        brent_tasks_done = len([t for t in state.tasks['done'] if t.get('assigned_resource') == 'brent'])
+        if 'brent_rescue' not in state.minigames_completed and brent_tasks_done >= 2 and not state.active_minigame:
+            state.active_minigame = 'brent_rescue'
+            self._start_brent_rescue_minigame()
+
+        # Trigger Flow Optimization on Level 2
+        elif 'flow_optimization' not in state.minigames_completed and state.level >= 2 and not state.active_minigame:
+            if state.current_sprint and state.current_sprint.phase == 'active':
+                if state.current_sprint.current_week >= 1:
+                    state.active_minigame = 'flow_optimization'
+                    self._start_flow_optimization_minigame()
+
+        # Trigger Firefighting when unplanned work spikes
+        elif 'firefighting' not in state.minigames_completed and state.unplanned_work > 50 and not state.active_minigame:
+            if len([t for t in state.tasks['in_progress'] if t['type'] == WorkType.UNPLANNED]) >= 2:
+                state.active_minigame = 'firefighting'
+                self._start_firefighting_minigame()
 
     # --- Sprint Action Handlers ---
 

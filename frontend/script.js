@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const resourcePool = document.getElementById('resource-pool');
     const newGameBtn = document.getElementById('new-game-btn');
     const saveGameBtn = document.getElementById('save-game-btn');
+    const debugMinigamesBtn = document.getElementById('debug-minigames-btn');
     // Sprint Elements
     const sprintStatus = document.getElementById('sprint-status');
     const sprintBtn = document.getElementById('sprint-btn');
@@ -56,6 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Attach Event Listeners
         newGameBtn.onclick = startNewGame;
         saveGameBtn.onclick = handleSaveGame;
+        debugMinigamesBtn.onclick = showDebugMinigameMenu;
 
         // Sprint Event Listeners
         sprintBtn.onclick = handleSprintButtonClick;
@@ -109,6 +111,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function handleSaveGame() {
         alert("Save functionality placeholder.");
+    }
+
+    async function showDebugMinigameMenu() {
+        const minigameType = prompt("Выберите минигейм для тестирования:\n1 - brent_rescue\n2 - flow_optimization\n3 - firefighting", "1");
+        const minigames = {
+            '1': 'brent_rescue',
+            '2': 'flow_optimization',
+            '3': 'firefighting',
+            'brent_rescue': 'brent_rescue',
+            'flow_optimization': 'flow_optimization',
+            'firefighting': 'firefighting'
+        };
+
+        const selected = minigames[minigameType];
+        if (selected) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/debug/start_minigame`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ minigame_type: selected })
+                });
+                const state = await response.json();
+                render(state);
+            } catch (error) {
+                console.error("Failed to start minigame:", error);
+            }
+        }
     }
 
     // --- Rendering Logic ---
@@ -632,6 +661,418 @@ document.addEventListener('DOMContentLoaded', () => {
             notes: notes
         });
     }
+
+    // --- MINIGAME SYSTEM ---
+
+    // Minigame modals
+    const brentRescueModal = document.getElementById('brent-rescue-modal');
+    const brentRescueClose = document.getElementById('brent-rescue-close');
+    const brentRescueSkip = document.getElementById('brent-rescue-skip');
+    const brentRescueSubmit = document.getElementById('brent-rescue-submit');
+    const knowledgeItemsContainer = document.getElementById('knowledge-items');
+    const developerSlotsContainer = document.getElementById('developer-slots');
+    const brentRescueTimer = document.getElementById('brent-rescue-timer');
+
+    const flowOptimizationModal = document.getElementById('flow-optimization-modal');
+    const flowOptimizationClose = document.getElementById('flow-optimization-close');
+    const flowOptimizationSkip = document.getElementById('flow-optimization-skip');
+    const flowOptimizationSubmit = document.getElementById('flow-optimization-submit');
+    const flowStageSliders = document.getElementById('flow-stage-sliders');
+
+    const firefightingModal = document.getElementById('firefighting-modal');
+    const firefightingClose = document.getElementById('firefighting-close');
+    const firefightingSkip = document.getElementById('firefighting-skip');
+    const firefightingSubmit = document.getElementById('firefighting-submit');
+    const incidentCardsContainer = document.getElementById('incident-cards');
+    const priorityQueueContainer = document.getElementById('priority-queue');
+
+    // Minigame state
+    let currentMinigame = null;
+    let minigameTimer = null;
+    let brentRescueState = {
+        knowledgeItems: [],
+        developerKnowledge: { dev1: [], dev2: [], dev3: [] }
+    };
+    let flowOptimizationState = {
+        limits: { backlog: 10, in_progress: 3, review: 2, deploy: 2 }
+    };
+    let firefightingState = {
+        incidents: [],
+        priorityAssignments: {}
+    };
+
+    // Check for active minigame in state
+    function checkMinigame(state) {
+        if (state.active_minigame && state.active_minigame !== currentMinigame) {
+            openMinigame(state.active_minigame, state.minigame_data);
+        }
+    }
+
+    function openMinigame(minigameType, data) {
+        currentMinigame = minigameType;
+
+        if (minigameType === 'brent_rescue') {
+            openBrentRescueMinigame(data);
+        } else if (minigameType === 'flow_optimization') {
+            openFlowOptimizationMinigame(data);
+        } else if (minigameType === 'firefighting') {
+            openFirefightingMinigame(data);
+        }
+    }
+
+    function closeMinigame() {
+        if (minigameTimer) {
+            clearInterval(minigameTimer);
+            minigameTimer = null;
+        }
+        brentRescueModal.style.display = 'none';
+        flowOptimizationModal.style.display = 'none';
+        firefightingModal.style.display = 'none';
+        currentMinigame = null;
+    }
+
+    function submitMinigameResult(minigameType, success, score = 0) {
+        sendAction({
+            type: 'minigame_result',
+            minigame_type: minigameType,
+            success: success,
+            score: score
+        });
+        closeMinigame();
+    }
+
+    // BRENT RESCUE MINIGAME
+    function openBrentRescueMinigame(data) {
+        brentRescueState = {
+            knowledgeItems: [...(data.knowledge_items || [])],
+            developerKnowledge: { dev1: [], dev2: [], dev3: [] }
+        };
+
+        // Render knowledge items
+        knowledgeItemsContainer.innerHTML = brentRescueState.knowledgeItems.map(item => `
+            <div class="knowledge-item" draggable="true" data-knowledge-id="${item.id}">
+                <span>${item.icon}</span>
+                <span>${item.title}</span>
+            </div>
+        `).join('');
+
+        // Render developer slots
+        developerSlotsContainer.innerHTML = `
+            <div class="developer-slot" data-dev-id="dev1">
+                <div class="developer-slot-header">
+                    <div class="developer-avatar">А</div>
+                    <span class="developer-name">Алекс</span>
+                </div>
+                <div class="developer-knowledge" data-dev-knowledge="dev1"></div>
+            </div>
+            <div class="developer-slot" data-dev-id="dev2">
+                <div class="developer-slot-header">
+                    <div class="developer-avatar">М</div>
+                    <span class="developer-name">Мария</span>
+                </div>
+                <div class="developer-knowledge" data-dev-knowledge="dev2"></div>
+            </div>
+            <div class="developer-slot" data-dev-id="dev3">
+                <div class="developer-slot-header">
+                    <div class="developer-avatar">Д</div>
+                    <span class="developer-name">Джон</span>
+                </div>
+                <div class="developer-knowledge" data-dev-knowledge="dev3"></div>
+            </div>
+        `;
+
+        // Setup drag and drop for knowledge items
+        setupBrentRescueDragDrop();
+
+        // Start timer
+        let timeLeft = data.time_limit || 60;
+        brentRescueTimer.textContent = `${timeLeft}s`;
+        minigameTimer = setInterval(() => {
+            timeLeft--;
+            brentRescueTimer.textContent = `${timeLeft}s`;
+            if (timeLeft <= 0) {
+                clearInterval(minigameTimer);
+            }
+        }, 1000);
+
+        brentRescueModal.style.display = 'flex';
+    }
+
+    function setupBrentRescueDragDrop() {
+        let draggedKnowledge = null;
+
+        // Knowledge items drag start
+        document.querySelectorAll('.knowledge-item').forEach(item => {
+            item.addEventListener('dragstart', (e) => {
+                draggedKnowledge = e.target.dataset.knowledgeId;
+                e.target.classList.add('dragging');
+            });
+            item.addEventListener('dragend', (e) => {
+                e.target.classList.remove('dragging');
+                draggedKnowledge = null;
+            });
+        });
+
+        // Developer slots drop handling
+        document.querySelectorAll('.developer-slot').forEach(slot => {
+            slot.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                slot.classList.add('drag-over');
+            });
+            slot.addEventListener('dragleave', () => {
+                slot.classList.remove('drag-over');
+            });
+            slot.addEventListener('drop', (e) => {
+                e.preventDefault();
+                slot.classList.remove('drag-over');
+
+                if (draggedKnowledge) {
+                    const devId = slot.dataset.devId;
+                    const knowledgeItem = brentRescueState.knowledgeItems.find(k => k.id === draggedKnowledge);
+
+                    if (knowledgeItem) {
+                        // Add to developer's knowledge
+                        brentRescueState.developerKnowledge[devId].push(knowledgeItem);
+
+                        // Remove from pool
+                        brentRescueState.knowledgeItems = brentRescueState.knowledgeItems.filter(k => k.id !== draggedKnowledge);
+
+                        // Update UI
+                        updateBrentRescueUI();
+                    }
+                }
+            });
+        });
+    }
+
+    function updateBrentRescueUI() {
+        // Update knowledge pool
+        knowledgeItemsContainer.innerHTML = brentRescueState.knowledgeItems.map(item => `
+            <div class="knowledge-item" draggable="true" data-knowledge-id="${item.id}">
+                <span>${item.icon}</span>
+                <span>${item.title}</span>
+            </div>
+        `).join('');
+
+        // Re-setup drag for remaining items
+        document.querySelectorAll('.knowledge-item').forEach(item => {
+            item.addEventListener('dragstart', (e) => {
+                window.draggedKnowledge = e.target.dataset.knowledgeId;
+                e.target.classList.add('dragging');
+            });
+            item.addEventListener('dragend', (e) => {
+                e.target.classList.remove('dragging');
+                window.draggedKnowledge = null;
+            });
+        });
+
+        // Update developer knowledge displays
+        Object.keys(brentRescueState.developerKnowledge).forEach(devId => {
+            const container = document.querySelector(`[data-dev-knowledge="${devId}"]`);
+            if (container) {
+                container.innerHTML = brentRescueState.developerKnowledge[devId].map(k => `
+                    <div class="knowledge-item">
+                        <span>${k.icon}</span>
+                    </div>
+                `).join('');
+            }
+        });
+    }
+
+    // FLOW OPTIMIZATION MINIGAME
+    function openFlowOptimizationMinigame(data) {
+        const stages = data.stages || [];
+        flowOptimizationState.limits = {
+            backlog: stages.find(s => s.id === 'backlog')?.optimal_limit || 10,
+            in_progress: stages.find(s => s.id === 'in_progress')?.optimal_limit || 3,
+            review: stages.find(s => s.id === 'review')?.optimal_limit || 2,
+            deploy: stages.find(s => s.id === 'deploy')?.optimal_limit || 2
+        };
+
+        // Render sliders
+        flowStageSliders.innerHTML = stages.map(stage => `
+            <div class="flow-slider-row">
+                <span class="flow-slider-label">${stage.name}</span>
+                <input type="range" class="flow-slider" data-stage="${stage.id}"
+                    min="1" max="15" value="${flowOptimizationState.limits[stage.id]}">
+                <span class="flow-slider-value" id="slider-value-${stage.id}">${flowOptimizationState.limits[stage.id]}</span>
+            </div>
+        `).join('');
+
+        // Setup slider change handlers
+        document.querySelectorAll('.flow-slider').forEach(slider => {
+            slider.addEventListener('input', (e) => {
+                const stage = e.target.dataset.stage;
+                const value = parseInt(e.target.value);
+                flowOptimizationState.limits[stage] = value;
+                document.getElementById(`slider-value-${stage}`).textContent = value;
+                document.getElementById(`limit-${stage}`).textContent = value;
+            });
+        });
+
+        flowOptimizationModal.style.display = 'flex';
+    }
+
+    // FIREFIGHTING MINIGAME
+    function openFirefightingMinigame(data) {
+        const incidents = data.incidents || [];
+        firefightingState = {
+            incidents: [...incidents],
+            priorityAssignments: {}
+        };
+
+        // Shuffle incidents for the pool
+        const shuffled = [...incidents].sort(() => Math.random() - 0.5);
+
+        // Render incident cards
+        incidentCardsContainer.innerHTML = shuffled.map(incident => `
+            <div class="incident-card ${incident.severity}" draggable="true" data-incident-id="${incident.id}">
+                <div class="incident-title">${incident.title}</div>
+                <div class="incident-description">${incident.description}</div>
+            </div>
+        `).join('');
+
+        // Setup drag and drop
+        setupFirefightingDragDrop();
+
+        firefightingModal.style.display = 'flex';
+    }
+
+    function setupFirefightingDragDrop() {
+        let draggedIncident = null;
+
+        // Incident cards drag start
+        document.querySelectorAll('.incident-card').forEach(card => {
+            card.addEventListener('dragstart', (e) => {
+                draggedIncident = {
+                    id: e.target.dataset.incidentId,
+                    element: e.target
+                };
+                e.target.classList.add('dragging');
+            });
+            card.addEventListener('dragend', (e) => {
+                e.target.classList.remove('dragging');
+                draggedIncident = null;
+            });
+        });
+
+        // Priority slots drop handling
+        document.querySelectorAll('.priority-slot').forEach(slot => {
+            slot.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                slot.classList.add('drag-over');
+            });
+            slot.addEventListener('dragleave', () => {
+                slot.classList.remove('drag-over');
+            });
+            slot.addEventListener('drop', (e) => {
+                e.preventDefault();
+                slot.classList.remove('drag-over');
+
+                if (draggedIncident && !slot.classList.contains('has-incident')) {
+                    const rank = slot.dataset.rank;
+                    const incidentData = firefightingState.incidents.find(i => i.id === draggedIncident.id);
+
+                    if (incidentData) {
+                        // Record assignment
+                        firefightingState.priorityAssignments[draggedIncident.id] = parseInt(rank);
+
+                        // Update slot UI
+                        slot.classList.add('has-incident');
+                        slot.innerHTML = `
+                            <span class="rank-label">${rank}.</span>
+                            <div class="incident-card ${incidentData.severity}" style="margin:0">
+                                <div class="incident-title">${incidentData.title}</div>
+                            </div>
+                        `;
+
+                        // Remove from pool
+                        draggedIncident.element.remove();
+                    }
+                }
+            });
+        });
+    }
+
+    // Minigame modal event listeners
+    brentRescueClose.onclick = () => {
+        closeMinigame();
+        // Skip minigame (mark as failed)
+        sendAction({ type: 'minigame_result', minigame_type: 'brent_rescue', success: false, score: 0 });
+    };
+
+    brentRescueSkip.onclick = () => {
+        closeMinigame();
+        sendAction({ type: 'minigame_result', minigame_type: 'brent_rescue', success: false, score: 0 });
+    };
+
+    brentRescueSubmit.onclick = () => {
+        // Check if each dev has at least 3 knowledge items
+        const targetKnowledge = 3;
+        const success = Object.values(brentRescueState.developerKnowledge).every(
+            knowledge => knowledge.length >= targetKnowledge
+        );
+        const score = Object.values(brentRescueState.developerKnowledge).reduce(
+            (sum, knowledge) => sum + knowledge.length, 0
+        );
+        submitMinigameResult('brent_rescue', success, score);
+    };
+
+    flowOptimizationClose.onclick = () => {
+        closeMinigame();
+        sendAction({ type: 'minigame_result', minigame_type: 'flow_optimization', success: false, score: 0 });
+    };
+
+    flowOptimizationSkip.onclick = () => {
+        closeMinigame();
+        sendAction({ type: 'minigame_result', minigame_type: 'flow_optimization', success: false, score: 0 });
+    };
+
+    flowOptimizationSubmit.onclick = () => {
+        // Check if limits are close to optimal
+        const optimal = { backlog: 10, in_progress: 3, review: 2, deploy: 2 };
+        const current = flowOptimizationState.limits;
+        const tolerance = 2;
+
+        const success = Object.keys(optimal).every(key => {
+            return Math.abs(current[key] - optimal[key]) <= tolerance;
+        });
+
+        submitMinigameResult('flow_optimization', success, 0);
+    };
+
+    firefightingClose.onclick = () => {
+        closeMinigame();
+        sendAction({ type: 'minigame_result', minigame_type: 'firefighting', success: false, score: 0 });
+    };
+
+    firefightingSkip.onclick = () => {
+        closeMinigame();
+        sendAction({ type: 'minigame_result', minigame_type: 'firefighting', success: false, score: 0 });
+    };
+
+    firefightingSubmit.onclick = () => {
+        // Check if all incidents are in correct priority order
+        const assignments = firefightingState.priorityAssignments;
+        const incidents = firefightingState.incidents;
+
+        let correctCount = 0;
+        incidents.forEach(incident => {
+            if (assignments[incident.id] === incident.correct_order) {
+                correctCount++;
+            }
+        });
+
+        const success = correctCount === incidents.length;
+        submitMinigameResult('firefighting', success, correctCount);
+    };
+
+    // Override render to check for minigames
+    const originalRender = render;
+    render = function(state) {
+        originalRender(state);
+        checkMinigame(state);
+    };
 
     init();
 });
