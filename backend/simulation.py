@@ -71,6 +71,16 @@ class GameState:
         self.phoenix_progress = 0
         self.wip_limit = 99
 
+        # Additional metrics for level transitions (Levels 3-6)
+        self.bus_factor = 1  # Number of people who know critical systems
+        self.knowledge = 10  # Documentation and knowledge sharing percentage
+        self.process_efficiency = 20  # How well processes work
+        self.vsm_ratio = 90  # Value Stream Mapping waste ratio (lower is better)
+        self.learning_rate = 10  # How fast team learns from mistakes
+        self.experiment_velocity = 5  # Number of experiments per sprint
+        self.cicd_coverage = 0  # CI/CD automation percentage
+        self.quality_score = 30  # Code quality metric
+
         # Logs
         self.chat_history = [{"sender": "System", "text": "Добро пожаловать в симулятор 'Проект Феникс'!"}]
         self.mentor_log = [{"sender": "Эрик", "text": "Наблюдай за потоком работы. Где твое ограничение?"}]
@@ -260,6 +270,73 @@ class SimulationEngine:
         state.chat_history.append({"sender": "System", "text": "--- УРОВЕНЬ 2: УВИДЕТЬ ПОТОК ---"})
         state.mentor_log.append({"sender": "Эрик", "text": "Поздравляю, ты потушил пожары. Теперь ты должен научиться видеть поток. Мы вводим WIP-лимиты. Не бери в работу больше 3 задач одновременно!"})
 
+    def _initialize_level_3(self):
+        state = self.active_game_state
+        state.level = 3
+        state.wip_limit = 4  # Slightly increased
+        state.unplanned_work = 15  # Further stabilized
+
+        # Add quality-focused tasks
+        new_tasks = [
+            {"id": "task-auto-1", "title": "Automated Tests Setup", "type": WorkType.INTERNAL, "points": 8, "duration": 4, "required_resource": "brent", "assigned_resource": None, "description": "Внедрить автоматизированное тестирование."},
+            {"id": "task-qa-1", "title": "Integrate QA into Team", "type": WorkType.INTERNAL, "points": 5, "duration": 3, "required_resource": None, "assigned_resource": None, "description": "Интегрировать QA в команду разработки."},
+            {"id": "task-cab-1", "title": "Establish CAB Process", "type": WorkType.CHANGES, "points": 3, "duration": 2, "required_resource": None, "assigned_resource": None, "description": "Создать процесс CAB для управления изменениями."}
+        ]
+
+        state.tasks["backlog"].extend(new_tasks)
+
+        state.chat_history.append({"sender": "System", "text": "--- УРОВЕНЬ 3: ПЕТЛЯ ОБРАТНОЙ СВЯЗИ ---"})
+        state.mentor_log.append({"sender": "Эрик", "text": "Отлично! Теперь нужно сократить количество багов, доходящих до продакшена. Внедрите качество на источнике и формальный процесс управления изменениями (CAB)."})
+
+    def _initialize_level_4(self):
+        state = self.active_game_state
+        state.level = 4
+        state.wip_limit = 5
+
+        # Add automation tasks
+        new_tasks = [
+            {"id": "task-cicd-1", "title": "Create CI/CD Pipeline", "type": WorkType.INTERNAL, "points": 13, "duration": 6, "required_resource": "brent", "assigned_resource": None, "description": "Создать CI/CD пайплайн для автоматизации деплоев."},
+            {"id": "task-iac-1", "title": "Infrastructure as Code", "type": WorkType.INTERNAL, "points": 8, "duration": 4, "required_resource": "brent", "assigned_resource": None, "description": "Внедрить инфраструктуру как код."},
+            {"id": "task-doc-1", "title": "Document Brent's Knowledge", "type": WorkType.INTERNAL, "points": 5, "duration": 3, "required_resource": None, "assigned_resource": None, "description": "Документировать знания Брента для снижения bus factor."}
+        ]
+
+        state.tasks["backlog"].extend(new_tasks)
+
+        state.chat_history.append({"sender": "System", "text": "--- УРОВЕНЬ 4: КУЛЬТУРА УЛУЧШЕНИЙ ---"})
+        state.mentor_log.append({"sender": "Эрик", "text": "Пора строить культуру постоянного улучшения. Автоматизируйте всё, можно. Поощряйте эксперименты и обучайтесь на ошибках."})
+
+    def _initialize_level_5(self):
+        state = self.active_game_state
+        state.level = 5
+        state.wip_limit = 6
+
+        # Add continuous improvement tasks
+        new_tasks = [
+            {"id": "task-knowledge-1", "title": "Knowledge Sharing Sessions", "type": WorkType.INTERNAL, "points": 5, "duration": 2, "required_resource": None, "assigned_resource": None, "description": "Регулярные сессии обмена знаниями в команде."},
+            {"id": "task-vsm-1", "title": "Value Stream Mapping", "type": WorkType.INTERNAL, "points": 8, "duration": 4, "required_resource": None, "assigned_resource": None, "description": "Построить карту потока создания ценности для выявления потерь."},
+            {"id": "task-experiment-1", "title": "Run Experiments", "type": WorkType.BUSINESS, "points": 3, "duration": 1, "required_resource": None, "assigned_resource": None, "description": "Провести эксперименты для улучшения процессов."}
+        ]
+
+        state.tasks["backlog"].extend(new_tasks)
+
+        state.chat_history.append({"sender": "System", "text": "--- УРОВЕНЬ 5: ОРГАНИЗАЦИОННОЕ ОБУЧЕНИЕ ---"})
+        state.mentor_log.append({"sender": "Эрик", "text": "Вы готовы к следующему шагу. Сосредоточьтесь на обучении организации, снижении потерь и постоянном экспериментировании."})
+
+    def _initialize_level_6(self):
+        state = self.active_game_state
+        state.level = 6  # Max level - game is about winning
+
+        # Final challenge tasks
+        new_tasks = [
+            {"id": "final-1", "title": "Competitor Response Feature", "type": WorkType.BUSINESS, "points": 21, "duration": 10, "required_resource": "brent", "assigned_resource": None, "description": "Конкурент выпустил новую функцию! Нужно быстро ответить."},
+            {"id": "final-2", "title": "Scale to 10 Deploys/Day", "type": WorkType.INTERNAL, "points": 13, "duration": 6, "required_resource": "brent", "assigned_resource": None, "description": "Масштабировать систему до 10 деплоев в день."}
+        ]
+
+        state.tasks["backlog"].extend(new_tasks)
+
+        state.chat_history.append({"sender": "System", "text": "--- УРОВЕНЬ 6: ФИНАЛЬНЫЙ ВЫЗОВ ---"})
+        state.mentor_log.append({"sender": "Эрик", "text": "Финальный испытание! Конкуренты давят. Используйте всё, что вы узнали: поток, обратную связь, культуру улучшений. Покажите, на что способны!"})
+
     def _check_level_transition(self):
         state = self.active_game_state
 
@@ -268,9 +345,44 @@ class SimulationEngine:
         if state.level == 1:
             unplanned_done = len([t for t in state.tasks['done'] if t['type'] == WorkType.UNPLANNED])
             # We spawned 3 unplanned tasks. If 3 are done, we proceed.
-            # (Assuming player didn't delete them, which isn't possible yet)
             if unplanned_done >= 3:
                  self._initialize_level_2()
+
+        # Level 2 -> Level 3 Transition
+        # Condition: Stability 80%, 5+ tasks done, WIP limit being used
+        elif state.level == 2:
+            tasks_done = len(state.tasks['done'])
+            if state.stability >= 80 and tasks_done >= 5:
+                self._initialize_level_3()
+
+        # Level 3 -> Level 4 Transition
+        # Condition: CI/CD 100%, stability 85%
+        elif state.level == 3:
+            if state.cicd_coverage >= 100 and state.stability >= 85:
+                self._initialize_level_4()
+
+        # Level 4 -> Level 5 Transition
+        # Condition: Bus factor 3+, knowledge 75%
+        elif state.level == 4:
+            if state.bus_factor >= 3 and state.knowledge >= 75:
+                self._initialize_level_5()
+
+        # Level 5 -> Level 6 Transition
+        # Condition: Process efficiency 80%, VSM ratio 25%
+        elif state.level == 5:
+            if state.process_efficiency >= 80 and state.vsm_ratio <= 25:
+                self._initialize_level_6()
+
+        # Level 6 Win Condition
+        # Condition: Learning rate 80%, experiment velocity 70%
+        elif state.level == 6:
+            if state.learning_rate >= 80 and state.experiment_velocity >= 70:
+                self._handle_game_win()
+
+    def _handle_game_win(self):
+        state = self.active_game_state
+        state.chat_history.append({"sender": "System", "text": "🎉 ПОБЕДА! Вы успешно трансформировали IT-отдел!"})
+        state.mentor_log.append({"sender": "Эрик", "text": "Невероятно! Вы превратили хаос в хорошо отлаженную машину. Команда учится, экспериментирует и постоянно улучшается. Вы готовы к любым вызовам!"})
 
     # --- Action Handlers ---
 

@@ -115,7 +115,15 @@ document.addEventListener('DOMContentLoaded', () => {
     function render(state) {
         // Check for Level Change (Transition Animation placeholder)
         if (currentState && currentState.level < state.level) {
-            alert(`CONGRATULATIONS! Level ${currentState.level} Complete.\nStarting Level ${state.level}: The First Way (Flow)`);
+            const levelNames = {
+                2: "The First Way (Flow)",
+                3: "The Second Way (Feedback)",
+                4: "The Third Way (Culture)",
+                5: "Organizational Learning",
+                6: "Final Challenge"
+            };
+            const newLevelName = levelNames[state.level] || `Level ${state.level}`;
+            alert(`CONGRATULATIONS! Level ${currentState.level} Complete.\nStarting Level ${state.level}: ${newLevelName}`);
         }
 
         currentState = state;
@@ -124,6 +132,11 @@ document.addEventListener('DOMContentLoaded', () => {
         levelDisplay.textContent = state.level;
         if (state.level === 1) levelTitle.textContent = "The Stabilizer";
         else if (state.level === 2) levelTitle.textContent = "The First Way (Flow)";
+        else if (state.level === 3) levelTitle.textContent = "The Second Way (Feedback)";
+        else if (state.level === 4) levelTitle.textContent = "The Third Way (Culture)";
+        else if (state.level === 5) levelTitle.textContent = "Organizational Learning";
+        else if (state.level === 6) levelTitle.textContent = "Final Challenge";
+        else levelTitle.textContent = `Level ${state.level}`;
 
         metricBudget.textContent = `$${state.budget.toLocaleString()}`;
         metricStability.textContent = `${state.stability}%`;
