@@ -277,6 +277,32 @@
         </div>
     </div>
 
+    <!-- TUTORIAL MODAL -->
+    <div id="tutorial-modal" class="modal-overlay tutorial-overlay" style="display: none;">
+        <div class="tutorial-content">
+            <div class="tutorial-header">
+                <h2 id="tutorial-title">Welcome to Phoenix Simulator!</h2>
+                <button class="tutorial-skip-btn" id="tutorial-skip">Skip Tutorial</button>
+            </div>
+            <div class="tutorial-body">
+                <div class="tutorial-step" id="tutorial-step-content">
+                    <!-- Tutorial content injected by JS -->
+                </div>
+                <div class="tutorial-progress">
+                    <span id="tutorial-step-indicator">1 / 5</span>
+                </div>
+            </div>
+            <div class="tutorial-footer">
+                <button class="tutorial-nav-btn" id="tutorial-prev" style="display: none;">Previous</button>
+                <button class="tutorial-nav-btn primary" id="tutorial-next">Next</button>
+            </div>
+        </div>
+        <!-- Highlight spotlight -->
+        <div class="tutorial-spotlight" id="tutorial-spotlight"></div>
+        <!-- Highlight overlay -->
+        <div class="tutorial-highlight-overlay" id="tutorial-highlight-overlay"></div>
+    </div>
+
     <script src="script.js"></script>
 </body>
 </html>

@@ -869,3 +869,194 @@ body {
     outline: none;
     border-color: var(--accent-primary);
 }
+
+/* --- TUTORIAL OVERLAY --- */
+.tutorial-overlay {
+    z-index: 2000;
+    background: transparent;
+}
+
+.tutorial-content {
+    position: fixed;
+    background: var(--bg-panel);
+    border-radius: 16px;
+    width: 400px;
+    max-width: 90vw;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--accent-primary);
+    z-index: 2002;
+    animation: tutorialSlideIn 0.3s ease-out;
+}
+
+@keyframes tutorialSlideIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.tutorial-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.tutorial-header h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--accent-primary);
+}
+
+.tutorial-skip-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.tutorial-skip-btn:hover {
+    color: var(--text-primary);
+    border-color: var(--text-secondary);
+}
+
+.tutorial-body {
+    padding: 24px;
+}
+
+.tutorial-step {
+    min-height: 80px;
+}
+
+.tutorial-step h3 {
+    font-size: 16px;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+}
+
+.tutorial-step p {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+
+.tutorial-step-icon {
+    font-size: 48px;
+    text-align: center;
+    margin-bottom: 16px;
+}
+
+.tutorial-progress {
+    text-align: center;
+    margin-top: 16px;
+}
+
+.tutorial-progress span {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.tutorial-footer {
+    display: flex;
+    justify-content: space-between;
+    padding: 16px 24px;
+    border-top: 1px solid var(--border-color);
+}
+
+.tutorial-nav-btn {
+    padding: 10px 24px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    transition: all 0.2s;
+}
+
+.tutorial-nav-btn:hover {
+    background: var(--border-color);
+}
+
+.tutorial-nav-btn.primary {
+    background: var(--accent-primary);
+    color: white;
+    border-color: var(--accent-primary);
+}
+
+.tutorial-nav-btn.primary:hover {
+    background: #2563eb;
+}
+
+/* Tutorial Spotlight/Highlight */
+.tutorial-spotlight {
+    position: fixed;
+    pointer-events: none;
+    border: 3px solid var(--accent-primary);
+    border-radius: 8px;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.75), 0 0 20px rgba(59, 130, 246, 0.5);
+    z-index: 2001;
+    transition: all 0.3s ease;
+    opacity: 0;
+}
+
+.tutorial-spotlight.active {
+    opacity: 1;
+}
+
+.tutorial-highlight-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.75);
+    pointer-events: none;
+    z-index: 2000;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.tutorial-highlight-overlay.active {
+    opacity: 1;
+}
+
+/* Tutorial highlight target class */
+.tutorial-highlight-target {
+    position: relative;
+    z-index: 2001;
+    animation: tutorialPulse 1.5s infinite;
+}
+
+@keyframes tutorialPulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+    }
+    50% {
+        box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+    }
+}
+
+/* Tutorial tooltip arrow (optional enhancement) */
+.tutorial-content::before {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 0;
+    border: 10px solid transparent;
+    border-top-color: var(--accent-primary);
+    opacity: 0;
+    transition: opacity 0.3s;
+}
