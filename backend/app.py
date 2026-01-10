@@ -51,6 +51,22 @@ def handle_action():
     new_state = engine.process_action(action_data)
     return jsonify(new_state)
 
+@app.route('/api/llm_response', methods=['POST'])
+def get_llm_response():
+    """Получает ответ от LLM для указанной роли."""
+    data = request.json
+    if not data or 'role' not in data:
+        return jsonify({"error": "role is required"}), 400
+
+    role = data.get('role')
+    response = engine.get_llm_response(role)
+
+    return jsonify({
+        "role": role,
+        "response": response,
+        "llm_mode": engine.llm_mode
+    })
+
 
 # --- Маршрут для обслуживания фронтенда ---
 

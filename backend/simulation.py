@@ -4,6 +4,8 @@ import os
 import glob
 from datetime import datetime, timedelta
 from enum import Enum
+import requests
+from typing import Optional, List, Dict
 
 SAVES_DIR = os.path.join(os.path.dirname(__file__), 'saves')
 
@@ -155,19 +157,310 @@ class MockLLM:
 
 class OpenRouterLLM:
     """Взаимодействует с LLM через OpenRouter для генерации ответов."""
-    def __init__(self, api_key):
-        self.client = None
-        self.model = "z-ai/glm-4.5-air:free"
 
-    def get_response(self, role, chat_history):
-        return "AI service is currently unavailable."
+    # Системные промпты для каждого персонажа
+    SYSTEM_PROMPTS = {
+        "erik": """Ты — Эрик Рид, наставник из книги "Проект Феникс". Ты мудрый ветеран DevOps,
+который помогает герою (Биллу) понять принципы потока, ограничений и непрерывных улучшений.
+
+Твой стиль:
+- Говоришь короткими, проницательными фразами
+- Задаешь наводящие вопросы вместо прямых ответов
+- Фокусируешься на поиске системных ограничений
+- Используешь метафоры (поток, ограничение, бутылочное горлышко)
+
+Ключевые концепции:
+- Теория ограничений: каждая система имеет одно ограничение
+- Четыре типа работы: Бизнес-проекты, Внутренние проекты, Изменения, Незапланированная работа
+- Незапланированная работа убивает продуктивность
+- WIP-лимиты помогают увидеть поток
+- Брент — это ограничение системы
+
+Отвечай на русском языке, кратко (1-2 предложения), в стиле мудрого наставника.""",
+
+        "developer": """Ты — разработчик в компании из "Проект Феникс". Ты перегружен работой,
+постоянно прерываешься на инциденты и не можешь сосредоточиться на главной задаче.
+
+Твой стиль:
+- Устал, фрустрирован
+- Жалуешься на постоянные переключения контекста
+- Хочешь работать над Project Phoenix, но всегда возникают пожары
+- Саркастический, но профессиональный
+
+Отвечай на русском языке, кратко (1-2 предложения), с усталым юмором.""",
+
+        "manager": """Ты — Стив, менеджер проекта из "Проект Феникс". Ты находишься под
+давлением со всех сторон: CFO требует зарплатную ведомость, маркетинг требует сайт,
+CISO требует патчи безопасности.
+
+Твой стиль:
+- Нервничаешь, но стараешься держаться
+- Фокусируешься на дедлайнах
+- Пытаешься распределить Брента на все задачи одновременно
+- Не понимаешь, почему ничего не успеваем
+
+Отвечай на русском языке, кратко (1-2 предложения), с нервным оттенком.""",
+
+        "cfo": """Ты — CFO компании из "Проект Феникс". Зарплатная ведомость не работает —
+люди не получат зарплату вовремя. Ты в ярости.
+
+Твой стиль:
+- Агрессивный, требовательный
+- Фокусируешься только на зарплатах
+- Грозишь увольнениями
+- Не интересуются техническими подробностями
+
+Отвечай на русском языке, кратко (1 предложение), очень требовательно.""",
+
+        "ciso": """Ты — CISO компании из "Проект Феникс". Обнаружена уязвимость в безопасности
+PII данных. Требуется немедленное исправление.
+
+Твой стиль:
+- Серьезный, озабоченный безопасностью
+- Фокусируешься на рисках утечки данных
+- Не терпишь отложек в вопросах безопасности
+- Профессиональный, но настойчивый
+
+Отвечай на русском языке, кратко (1-2 предложения), с озабоченностью.""",
+
+        "marketing": """Ты — глава маркетинга из "Проект Феникс". Сайт компании не работает,
+компания теряет лидов и клиентов каждую минуту.
+
+Твой стиль:
+- Паникуешь
+- Фокусируешься на упущенных продажах
+- Не понимаешь технических проблем
+- Требуешь немедленного решения
+
+Отвечай на русском языке, кратко (1-2 предложения), с паникой.""",
+
+        "stakeholder": """Ты — стейкхолдер/инвестор в компании из "Проект Феникс". Ты хочешь
+видеть прогресс по Project Phoenix.
+
+Твой стиль:
+- Деловой, ориентированный на результат
+- Спрашиваешь о статусе проекта
+- Не понимаешь, почему проект движется так медленно
+- Давишь на сроки
+
+Отвечай на русском языке, кратко (1-2 предложения), деловито.""",
+    }
+
+    def __init__(self, api_key: str, model: str = None):
+        """
+        Инициализация клиента OpenRouter.
+
+        Args:
+            api_key: API ключ OpenRouter (из переменной окружения OPENROUTER_API_KEY)
+            model: Модель для использования (по умолчанию бесплатные модели)
+        """
+        self.api_key = api_key
+        self.model = model or os.getenv("OPENROUTER_MODEL", "google/gemma-3-27b-it:free")
+        self.api_url = "https://openrouter.ai/api/v1/chat/completions"
+        self.headers = {
+            "Authorization": f"Bearer {api_key}",
+            "HTTP-Referer": "https://phoenix-simulator.dev",
+            "X-Title": "Phoenix Project Simulator",
+            "Content-Type": "application/json"
+        }
+        self._available = None  # Кэш доступности API
+
+    def is_available(self) -> bool:
+        """Проверяет, доступен ли API (есть ключ и работает)."""
+        if self._available is not None:
+            return self._available
+
+        if not self.api_key or self.api_key == "your-api-key-here":
+            self._available = False
+            return False
+
+        # Пробуем простой запрос для проверки
+        try:
+            response = requests.post(
+                self.api_url,
+                headers=self.headers,
+                json={
+                    "model": self.model,
+                    "messages": [{"role": "user", "content": "ping"}],
+                    "max_tokens": 1
+                },
+                timeout=10
+            )
+            self._available = response.status_code == 200
+        except Exception:
+            self._available = False
+
+        return self._available
+
+    def get_response(self, role: str, chat_history: Optional[List[Dict]] = None,
+                     context: Optional[Dict] = None) -> str:
+        """
+        Получает ответ от LLM для заданной роли.
+
+        Args:
+            role: Имя роли (erik, developer, manager, etc.)
+            chat_history: История чата для контекста
+            context: Дополнительный контекст (состояние игры, метрики и т.д.)
+
+        Returns:
+            Строка с ответом от LLM или fallback-ответ
+        """
+        if not self.is_available():
+            # Fallback на ответы MockLLM, если API недоступен
+            return self._get_fallback_response(role)
+
+        # Формируем сообщения для API
+        messages = []
+
+        # Системный промпт для роли
+        system_prompt = self.SYSTEM_PROMPTS.get(role.lower(), self.SYSTEM_PROMPTS["erik"])
+        messages.append({"role": "system", "content": system_prompt})
+
+        # Добавляем контекст игры если есть
+        if context:
+            context_str = self._format_context(context)
+            messages.append({
+                "role": "system",
+                "content": f"ТЕКУЩИЙ КОНТЕКСТ ИГРЫ:\n{context_str}\n\nУчитывай этот контекст при ответе."
+            })
+
+        # Добавляем историю чата (последние несколько сообщений)
+        if chat_history:
+            recent_history = chat_history[-5:] if len(chat_history) > 5 else chat_history
+            for msg in recent_history:
+                if msg.get("sender") and msg.get("text"):
+                    # Пропускаем системные сообщения
+                    if msg["sender"] != "System":
+                        role_mapping = {
+                            "user": "user",
+                            "assistant": "assistant",
+                            "Эрик": "user",
+                            "Брент": "user",
+                            "CFO": "user",
+                            "Steve": "user"
+                        }
+                        mapped_role = role_mapping.get(msg["sender"], "user")
+                        messages.append({
+                            "role": mapped_role,
+                            "content": msg["text"]
+                        })
+
+        # Добавляем prompt для генерации ответа
+        messages.append({
+            "role": "user",
+            "content": "Дай краткий ответ (1-2 предложения) на русском языке в соответствии с твоей ролью."
+        })
+
+        try:
+            response = requests.post(
+                self.api_url,
+                headers=self.headers,
+                json={
+                    "model": self.model,
+                    "messages": messages,
+                    "max_tokens": 150,
+                    "temperature": 0.8
+                },
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                if "choices" in data and len(data["choices"]) > 0:
+                    return data["choices"][0]["message"]["content"].strip()
+
+            # Если что-то пошло не так, используем fallback
+            return self._get_fallback_response(role)
+
+        except Exception as e:
+            # Логируем ошибку и возвращаем fallback
+            print(f"OpenRouter API error: {e}")
+            return self._get_fallback_response(role)
+
+    def _format_context(self, context: Dict) -> str:
+        """Форматирует контекст игры для промпта."""
+        parts = []
+        if "level" in context:
+            parts.append(f"Уровень: {context['level']}")
+        if "unplanned_work" in context:
+            parts.append(f"Незапланированная работа: {context['unplanned_work']}%")
+        if "budget" in context:
+            parts.append(f"Бюджет: ${context.get('budget', 0):,}")
+        if "wip_limit" in context:
+            parts.append(f"WIP-лимит: {context['wip_limit']}")
+        if "current_sprint" in context and context["current_sprint"]:
+            sprint = context["current_sprint"]
+            parts.append(f"Спринт: {sprint.get('id', 'N/A')}, Фаза: {sprint.get('phase', 'N/A')}")
+        return "\n".join(parts)
+
+    def _get_fallback_response(self, role: str) -> str:
+        """Возвращает базовые ответы, если API недоступен."""
+        fallback_responses = {
+            "erik": [
+                "Посмотри на поток. Где твое ограничение?",
+                "Ты постоянно тушишь пожары вместо того, чтобы работать над проектом.",
+                "Каждая система имеет ограничение. Найди его.",
+                "Сколько типов работы ты делаешь одновременно?",
+                "Брент — твое ограничение. Всё зависит от него."
+            ],
+            "developer": [
+                "Опять пожар? Я же пытался работать над фичей...",
+                "Понял, переключаюсь. Но когда мы наконец-то что-то доделаем?",
+                "Нужен четкий план. Постоянные переключения убивают продуктивность."
+            ],
+            "manager": [
+                "Команда, нам нужно ускориться!",
+                "Брент снова занят? Как мы будем распределять задачи?",
+                "Дедлайн близко. Давайте, сосредоточимся."
+            ],
+            "cfo": [
+                "Где мои деньги?! Зарплаты должны уйти сегодня!",
+                "Мне все равно на ваши технические проблемы — люди должны получить зарплату!"
+            ],
+            "ciso": [
+                "Это критическая уязвимость. Нельзя откладывать.",
+                "Безопасность прежде всего. Исправьте это немедленно."
+            ],
+            "marketing": [
+                "Сайт лежит! Мы теряем клиентов каждую минуту!",
+                "Маркетинг запущен, а сайт не работает. Это катастрофа!"
+            ],
+            "stakeholder": [
+                "Когда Project Phoenix будет готов?",
+                "Хочу видеть реальный прогресс, а не оправдания."
+            ]
+        }
+        responses = fallback_responses.get(role.lower(), fallback_responses["erik"])
+        return random.choice(responses)
 
 
 class SimulationEngine:
     """Управляет игровыми сессиями с использованием LLM."""
-    def __init__(self):
+    def __init__(self, use_llm: bool = None):
+        """
+        Инициализация движка симуляции.
+
+        Args:
+            use_llm: Использовать реальный LLM (OpenRouter). Если None, определяет по наличию API ключа.
+        """
         self.active_game_state = None
-        self.llm = MockLLM()
+
+        # Определяем, использовать ли реальный LLM
+        if use_llm is None:
+            # Автоопределение по наличию API ключа
+            api_key = os.getenv("OPENROUTER_API_KEY", "")
+            use_llm = bool(api_key and api_key != "your-api-key-here")
+
+        if use_llm:
+            api_key = os.getenv("OPENROUTER_API_KEY", "")
+            model = os.getenv("OPENROUTER_MODEL", "google/gemma-3-27b-it:free")
+            self.llm = OpenRouterLLM(api_key, model)
+            self.llm_mode = "openrouter"
+            print(f"[Phoenix Simulator] Используем OpenRouter LLM: {model}")
+        else:
+            self.llm = MockLLM()
+            self.llm_mode = "mock"
+            print("[Phoenix Simulator] Используем Mock LLM (симуляция)")
 
         if not os.path.exists(SAVES_DIR):
             os.makedirs(SAVES_DIR)
@@ -176,6 +469,36 @@ class SimulationEngine:
         self.active_game_state = GameState()
         self._initialize_level_1()
         return self.active_game_state.to_dict()
+
+    def get_llm_response(self, role: str, context: Optional[Dict] = None) -> str:
+        """
+        Получает ответ от LLM для указанной роли.
+
+        Args:
+            role: Имя роли (erik, developer, manager, cfo, ciso, marketing, stakeholder)
+            context: Опциональный контекст (состояние игры)
+
+        Returns:
+            Строка с ответом от LLM
+        """
+        if self.llm_mode == "openrouter":
+            # Передаем контекст игры для более умных ответов
+            game_context = {}
+            if self.active_game_state:
+                game_context = {
+                    "level": self.active_game_state.level,
+                    "unplanned_work": self.active_game_state.unplanned_work,
+                    "budget": self.active_game_state.budget,
+                    "wip_limit": self.active_game_state.wip_limit,
+                    "current_sprint": self.active_game_state.current_sprint.to_dict() if self.active_game_state.current_sprint else None
+                }
+            if context:
+                game_context.update(context)
+
+            return self.llm.get_response(role, self.active_game_state.chat_history if self.active_game_state else None, game_context)
+        else:
+            # Mock LLM не использует контекст
+            return self.llm.get_response(role)
 
     def save_game(self, slot_id):
         if not self.active_game_state: return {"error": "Нет активной игры для сохранения."}
