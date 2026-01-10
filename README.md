@@ -198,12 +198,49 @@ Games are saved as JSON in `backend/saves/save_<slot_id>.json`:
 
 ## Future Enhancements
 
-- [ ] Full LLM integration for dynamic character responses
+- [x] Full LLM integration for dynamic character responses
 - [ ] Levels 3 and 4 implementation
 - [ ] Gantt chart visualization
 - [ ] More sophisticated event system
 - [ ] Multiplayer mode
 - [ ] Custom scenario editor
+
+## LLM Integration
+
+The simulator now supports real LLM integration through OpenRouter for dynamic character responses.
+
+### Setup (Optional)
+
+1. Get a free API key from [OpenRouter](https://openrouter.ai/keys)
+2. Copy `.env.example` to `.env` and add your API key:
+```bash
+cp backend/.env.example backend/.env
+# Edit backend/.env and add your OPENROUTER_API_KEY
+```
+
+3. Set the environment variable before running:
+```bash
+export OPENROUTER_API_KEY=your-actual-api-key
+cd backend
+python app.py
+```
+
+### How It Works
+
+- **Without API key**: Uses MockLLM with pre-defined responses
+- **With API key**: Uses OpenRouter to generate contextual, dynamic responses
+- **Fallback**: Automatically falls back to MockLLM if API is unavailable
+
+### Supported Characters
+
+The LLM generates responses for these characters:
+- **Erik (Mentor)** - DevOps wisdom, flow principles
+- **Developer** - Frustrated developer
+- **Steve (Manager)** - Stressed project manager
+- **CFO** - Angry about payroll
+- **CISO** - Security focused
+- **Marketing** - Panicked about site
+- **Stakeholder** - Results oriented
 
 ## License
 

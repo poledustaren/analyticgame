@@ -1,3 +1,4 @@
 Flask
 Flask-Cors
-openrouter-client-unofficial
+requests
+# openrouter-client-unofficial  # Not needed - using direct API calls
