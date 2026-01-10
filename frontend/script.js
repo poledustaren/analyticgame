@@ -1,4 +1,274 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // ============================================
+    // UI/UX POLISH: Sound System & Notifications
+    // ============================================
+
+    // --- Sound System using Web Audio API ---
+    const SoundSystem = {
+        audioContext: null,
+        enabled: true,
+        volume: 0.3,
+
+        init() {
+            try {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            } catch (e) {
+                console.warn('Web Audio API not supported');
+                this.enabled = false;
+            }
+        },
+
+        toggle() {
+            this.enabled = !this.enabled;
+            const btn = document.getElementById('sound-toggle');
+            if (btn) {
+                btn.textContent = this.enabled ? '🔊' : '🔇';
+                btn.title = this.enabled ? 'Sound on' : 'Sound off';
+            }
+            return this.enabled;
+        },
+
+        play(type) {
+            if (!this.enabled || !this.audioContext) return;
+
+            // Resume context if suspended (required by browsers)
+            if (this.audioContext.state === 'suspended') {
+                this.audioContext.resume();
+            }
+
+            const now = this.audioContext.currentTime;
+
+            switch (type) {
+                case 'taskMove':
+                    this.playTone(440, 'sine', 0.05, now);
+                    this.playTone(660, 'sine', 0.05, now + 0.05);
+                    break;
+                case 'taskComplete':
+                    this.playTone(523, 'sine', 0.1, now);
+                    this.playTone(659, 'sine', 0.1, now + 0.1);
+                    this.playTone(784, 'sine', 0.15, now + 0.2);
+                    break;
+                case 'sprintStart':
+                    this.playTone(392, 'square', 0.1, now);
+                    this.playTone(523, 'square', 0.1, now + 0.1);
+                    this.playTone(659, 'square', 0.2, now + 0.2);
+                    break;
+                case 'sprintEnd':
+                    this.playTone(659, 'square', 0.15, now);
+                    this.playTone(523, 'square', 0.15, now + 0.15);
+                    this.playTone(392, 'square', 0.2, now + 0.3);
+                    break;
+                case 'levelUp':
+                    const notes = [523, 659, 784, 1047];
+                    notes.forEach((freq, i) => {
+                        this.playTone(freq, 'sine', 0.2, now + i * 0.15);
+                    });
+                    break;
+                case 'error':
+                    this.playTone(200, 'sawtooth', 0.1, now);
+                    this.playTone(150, 'sawtooth', 0.15, now + 0.1);
+                    break;
+                case 'notification':
+                    this.playTone(880, 'sine', 0.05, now);
+                    this.playTone(1100, 'sine', 0.05, now + 0.05);
+                    break;
+                case 'resourceAssign':
+                    this.playTone(330, 'triangle', 0.08, now);
+                    this.playTone(440, 'triangle', 0.08, now + 0.08);
+                    break;
+                case 'wipWarning':
+                    this.playTone(400, 'square', 0.05, now);
+                    setTimeout(() => this.playTone(400, 'square', 0.05), 100);
+                    break;
+                case 'modalOpen':
+                    this.playTone(600, 'sine', 0.05, now);
+                    break;
+                case 'modalClose':
+                    this.playTone(500, 'sine', 0.05, now);
+                    break;
+                case 'success':
+                    this.playTone(523, 'sine', 0.1, now);
+                    this.playTone(659, 'sine', 0.1, now + 0.1);
+                    break;
+            }
+        },
+
+        playTone(frequency, type, duration, startTime) {
+            if (!this.audioContext) return;
+
+            const oscillator = this.audioContext.createOscillator();
+            const gainNode = this.audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(this.audioContext.destination);
+
+            oscillator.type = type;
+            oscillator.frequency.setValueAtTime(frequency, startTime);
+
+            // Envelope for smooth sound
+            gainNode.gain.setValueAtTime(0, startTime);
+            gainNode.gain.linearRampToValueAtTime(this.volume, startTime + 0.01);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+            oscillator.start(startTime);
+            oscillator.stop(startTime + duration);
+        }
+    };
+
+    // --- Toast Notification System ---
+    const Toast = {
+        container: null,
+        queue: [],
+        isShowing: false,
+
+        init() {
+            this.container = document.getElementById('toast-container');
+        },
+
+        show(options) {
+            const { type = 'info', title = '', message = '', duration = 3000, icon = null } = options;
+
+            const defaultIcons = {
+                success: '✅',
+                error: '❌',
+                warning: '⚠️',
+                info: 'ℹ️'
+            };
+
+            const toastIcon = icon || defaultIcons[type] || defaultIcons.info;
+
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <span class="toast-icon">${toastIcon}</span>
+                <div class="toast-content">
+                    ${title ? `<div class="toast-title">${title}</div>` : ''}
+                    <div class="toast-message">${message}</div>
+                </div>
+                <button class="toast-close">&times;</button>
+            `;
+
+            // Close button
+            const closeBtn = toast.querySelector('.toast-close');
+            closeBtn.onclick = () => this.dismiss(toast);
+
+            this.container.appendChild(toast);
+
+            // Play notification sound
+            SoundSystem.play('notification');
+
+            // Auto-dismiss after duration
+            setTimeout(() => this.dismiss(toast), duration);
+
+            return toast;
+        },
+
+        dismiss(toast) {
+            if (!toast || !toast.parentNode) return;
+            toast.classList.add('removing');
+            setTimeout(() => toast.remove(), 300);
+        },
+
+        success(title, message, duration) {
+            return this.show({ type: 'success', title, message, duration });
+        },
+
+        error(title, message, duration) {
+            return this.show({ type: 'error', title, message, duration });
+        },
+
+        warning(title, message, duration) {
+            return this.show({ type: 'warning', title, message, duration });
+        },
+
+        info(title, message, duration) {
+            return this.show({ type: 'info', title, message, duration });
+        }
+    };
+
+    // --- Animation Helper Functions ---
+    const Animator = {
+        animateValue(element, start, end, duration, formatter = (v) => v) {
+            const range = end - start;
+            const startTime = performance.now();
+
+            const animate = (currentTime) => {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const easeProgress = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+
+                const current = start + (range * easeProgress);
+                element.textContent = formatter(current);
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    element.classList.remove('changed');
+                }
+            };
+
+            element.classList.add('changed');
+            requestAnimationFrame(animate);
+        },
+
+        triggerConfetti() {
+            const container = document.createElement('div');
+            container.className = 'confetti-container';
+            document.body.appendChild(container);
+
+            const colors = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#a855f7', '#06b6d4'];
+            const particles = 50;
+
+            for (let i = 0; i < particles; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'confetti-particle';
+                particle.style.left = Math.random() * 100 + 'vw';
+                particle.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                particle.style.animationDelay = Math.random() * 0.5 + 's';
+                particle.style.animationDuration = (2 + Math.random() * 2) + 's';
+                container.appendChild(particle);
+            }
+
+            setTimeout(() => container.remove(), 4000);
+        },
+
+        showLevelUp(oldLevel, newLevel, levelName) {
+            const overlay = document.createElement('div');
+            overlay.className = 'level-up-overlay';
+            overlay.innerHTML = `
+                <div class="level-up-content">
+                    <h1>LEVEL COMPLETE!</h1>
+                    <p>Level ${oldLevel} → Level ${newLevel}</p>
+                    <p style="margin-top: 10px; color: var(--accent-success);">${levelName}</p>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            SoundSystem.play('levelUp');
+            this.triggerConfetti();
+
+            setTimeout(() => {
+                overlay.style.opacity = '0';
+                overlay.style.transition = 'opacity 0.5s';
+                setTimeout(() => overlay.remove(), 500);
+            }, 3000);
+        }
+    };
+
+    // Initialize UI/UX systems
+    SoundSystem.init();
+    Toast.init();
+
+    // Sound toggle button handler
+    const soundToggle = document.getElementById('sound-toggle');
+    if (soundToggle) {
+        soundToggle.onclick = () => SoundSystem.toggle();
+    }
+
+    // ============================================
+    // END UI/UX POLISH
+    // ============================================
+
     // --- API & Constants ---
     const API_BASE_URL = 'http://127.0.0.1:5001/api';
 
@@ -10,17 +280,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const resourcePool = document.getElementById('resource-pool');
     const newGameBtn = document.getElementById('new-game-btn');
     const saveGameBtn = document.getElementById('save-game-btn');
-    // Training Elements
-    const trainingSection = document.getElementById('training-section');
-    const trainingStatus = document.getElementById('training-status');
-    const trainBtn = document.getElementById('train-btn');
-    const advanceWeekBtn = document.getElementById('advance-week-btn');
     // Sprint Elements
     const sprintStatus = document.getElementById('sprint-status');
     const sprintBtn = document.getElementById('sprint-btn');
     const sprintPhasesBar = document.getElementById('sprint-phases-bar');
     const sprintGoalText = document.getElementById('sprint-goal-text');
-    const standupBtn = document.getElementById('standup-btn');
     // Metrics
     const metricBudget = document.getElementById('metric-budget');
     const metricStability = document.getElementById('metric-stability');
@@ -53,100 +317,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const retroModal = document.getElementById('retro-modal');
     const retroCompleteBtn = document.getElementById('retro-complete');
 
-    // --- Tutorial Elements ---
-    const tutorialModal = document.getElementById('tutorial-modal');
-    const tutorialTitle = document.getElementById('tutorial-title');
-    const tutorialStepContent = document.getElementById('tutorial-step-content');
-    const tutorialStepIndicator = document.getElementById('tutorial-step-indicator');
-    const tutorialPrevBtn = document.getElementById('tutorial-prev');
-    const tutorialNextBtn = document.getElementById('tutorial-next');
-    const tutorialSkipBtn = document.getElementById('tutorial-skip');
-    const tutorialSpotlight = document.getElementById('tutorial-spotlight');
-    const tutorialHighlightOverlay = document.getElementById('tutorial-highlight-overlay');
-
-    // Event Modal Elements
-    const eventModal = document.getElementById('event-modal');
-    const eventTitle = document.getElementById('event-title');
-    const eventIcon = document.getElementById('event-icon');
-    const eventDescription = document.getElementById('event-description');
-    const eventSeverity = document.getElementById('event-severity');
-    const eventType = document.getElementById('event-type');
-    const eventChoices = document.getElementById('event-choices');
-
     // --- State Management ---
     let currentState = null;
     let planningSprintTasks = []; // Tasks selected during planning
-    let tutorialCurrentStep = 0;
-
-    // --- Tutorial Steps Configuration ---
-    const tutorialSteps = [
-        {
-            title: "Welcome to Phoenix Simulator! \ud83c\udf15",
-            icon: "\ud83d\udcb0",
-            content: `<h3>Welcome, Operations Lead!</h3>
-                <p>You've been tasked with saving Parts Unlimited from disaster. Your goal: stabilize the IT operations and deliver the Phoenix Project on time.</p>
-                <p>This tutorial will guide you through the basics of managing your workflow using Kanban and Agile principles.</p>`,
-            target: null,
-            position: 'center'
-        },
-        {
-            title: "Your Resources \ud83d\udc65",
-            icon: "\ud83d\udc65",
-            content: `<h3>Brent is your key resource</h3>
-                <p>Brent (and other resources) appears here. Some tasks <strong>require Brent</strong> to be completed - they'll show a "NEEDS BRENT" badge.</p>
-                <p>Drag Brent's avatar to tasks that need him to unblock work.</p>`,
-            target: '#resource-pool',
-            position: 'right'
-        },
-        {
-            title: "The Sprint \ud83d\udccb",
-            icon: "\ud83d\udccb",
-            content: `<h3>Work in Sprints</h3>
-                <p>Sprints help you focus on delivering value in fixed timeboxes. Click "Start Sprint" to begin planning.</p>
-                <p>During planning, select tasks from the backlog and set a sprint goal.</p>`,
-            target: '#sprint-btn',
-            position: 'right'
-        },
-        {
-            title: "Kanban Board \ud83d\udccb",
-            icon: "\ud83d\udccb",
-            content: `<h3>Visualize Your Work</h3>
-                <p>This is your Kanban board. Drag tasks between columns to progress them:</p>
-                <ul style="margin-left: 20px; color: #94a3b8;">
-                    <li><strong>BACKLOG</strong> - Tasks to do</li>
-                    <li><strong>IN PROGRESS</strong> - Currently working</li>
-                    <li><strong>REVIEW</strong> - Under review</li>
-                    <li><strong>DONE</strong> - Completed!</li>
-                </ul>
-                <p style="margin-top: 8px;">Watch your WIP limit - don't overload the system!</p>`,
-            target: '#board-container',
-            position: 'left'
-        },
-        {
-            title: "Mentor Guidance \ud83d\udc68\u200d\ud83d\udcbb",
-            icon: "\ud83d\udc68\u200d\ud83d\udcbb",
-            content: `<h3>Erik is here to help</h3>
-                <p>Erik Reid will provide guidance and tips in the Mentor panel. Pay attention to his advice - he knows the way!</p>
-                <p>The Team Chat shows communications from your team members.</p>`,
-            target: '#right-panel',
-            position: 'left'
-        },
-        {
-            title: "Ready to Start! \ud83d\ude80",
-            icon: "\ud83d\ude80",
-            content: `<h3>You're all set!</h3>
-                <p>Remember these key principles:</p>
-                <ul style="margin-left: 20px; color: #94a3b8;">
-                    <li>Limit WIP to improve flow</li>
-                    <li>Assign Brent to blocked tasks</li>
-                    <li>Complete sprints to build velocity</li>
-                    <li>Keep unplanned work low!</li>
-                </ul>
-                <p style="margin-top: 8px;">Good luck, Operations Lead. The fate of Parts Unlimited is in your hands!</p>`,
-            target: null,
-            position: 'center'
-        }
-    ];
 
     // --- Initialization ---
     function init() {
@@ -154,13 +327,8 @@ document.addEventListener('DOMContentLoaded', () => {
         newGameBtn.onclick = startNewGame;
         saveGameBtn.onclick = handleSaveGame;
 
-        // Training Event Listeners
-        trainBtn.onclick = handleTrainDeveloper;
-        advanceWeekBtn.onclick = handleAdvanceWeek;
-
         // Sprint Event Listeners
         sprintBtn.onclick = handleSprintButtonClick;
-        standupBtn.onclick = handleStandupClick;
 
         // Modal Event Listeners
         planningClose.onclick = closePlanningModal;
@@ -168,11 +336,6 @@ document.addEventListener('DOMContentLoaded', () => {
         planningConfirm.onclick = createSprint;
         reviewToRetroBtn.onclick = goToRetro;
         retroCompleteBtn.onclick = completeRetro;
-
-        // Tutorial Event Listeners
-        tutorialSkipBtn.onclick = endTutorial;
-        tutorialNextBtn.onclick = nextTutorialStep;
-        tutorialPrevBtn.onclick = prevTutorialStep;
 
         tabBtns.forEach(btn => {
             btn.addEventListener('click', () => {
@@ -190,170 +353,17 @@ document.addEventListener('DOMContentLoaded', () => {
         startNewGame();
     }
 
-    async function handleTrainDeveloper() {
-        await sendAction({ type: 'train_developer' });
-    }
-
-    async function handleAdvanceWeek() {
-        await sendAction({ type: 'advance_week' });
-    }
-
     async function startNewGame() {
         try {
             const response = await fetch(`${API_BASE_URL}/new_game`, { method: 'POST' });
             const state = await response.json();
             render(state);
-
-            // Check if first run - show tutorial
-            checkFirstRun();
+            Toast.success('New Game', 'Starting fresh...', 2000);
         } catch (error) {
             console.error("Failed to start game:", error);
+            SoundSystem.play('error');
+            Toast.error('Error', 'Failed to start new game', 4000);
         }
-    }
-
-    // --- Tutorial Functions ---
-
-    function checkFirstRun() {
-        const hasSeenTutorial = localStorage.getItem('phoenix_tutorial_completed');
-        if (!hasSeenTutorial) {
-            // Small delay to let UI render
-            setTimeout(() => startTutorial(), 500);
-        }
-    }
-
-    function startTutorial() {
-        tutorialCurrentStep = 0;
-        tutorialModal.style.display = 'flex';
-        showTutorialStep(0);
-    }
-
-    function showTutorialStep(stepIndex) {
-        const step = tutorialSteps[stepIndex];
-
-        // Update content
-        tutorialTitle.textContent = step.title;
-        tutorialStepIndicator.textContent = `${stepIndex + 1} / ${tutorialSteps.length}`;
-
-        // Build step HTML with icon
-        let html = '';
-        if (step.icon) {
-            html += `<div class="tutorial-step-icon">${step.icon}</div>`;
-        }
-        html += step.content;
-        tutorialStepContent.innerHTML = html;
-
-        // Update buttons
-        tutorialPrevBtn.style.display = stepIndex === 0 ? 'none' : 'block';
-        tutorialNextBtn.textContent = stepIndex === tutorialSteps.length - 1 ? 'Get Started!' : 'Next';
-
-        // Handle highlight
-        highlightElement(step.target, step.position);
-    }
-
-    function highlightElement(selector, position) {
-        // Clear previous highlights
-        clearHighlight();
-
-        if (!selector) {
-            // Center position, no highlight
-            positionTutorialContent('center');
-            tutorialHighlightOverlay.classList.add('active');
-            return;
-        }
-
-        const target = document.querySelector(selector);
-        if (target) {
-            const rect = target.getBoundingClientRect();
-
-            // Show overlay
-            tutorialHighlightOverlay.classList.add('active');
-
-            // Position and show spotlight
-            tutorialSpotlight.style.width = `${rect.width + 16}px`;
-            tutorialSpotlight.style.height = `${rect.height + 16}px`;
-            tutorialSpotlight.style.top = `${rect.top - 8}px`;
-            tutorialSpotlight.style.left = `${rect.left - 8}px`;
-            tutorialSpotlight.classList.add('active');
-
-            // Add pulse class to target
-            target.classList.add('tutorial-highlight-target');
-
-            // Position tutorial content near the target
-            positionTutorialContent(position, rect);
-        } else {
-            // Target not found, center the modal
-            positionTutorialContent('center');
-            tutorialHighlightOverlay.classList.add('active');
-        }
-    }
-
-    function positionTutorialContent(position, targetRect) {
-        const content = document.querySelector('.tutorial-content');
-        const margin = 20;
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-
-        // Reset positioning
-        content.style.top = '';
-        content.style.left = '';
-        content.style.right = '';
-        content.style.bottom = '';
-        content.style.transform = '';
-
-        if (position === 'center' || !targetRect) {
-            content.style.top = '50%';
-            content.style.left = '50%';
-            content.style.transform = 'translate(-50%, -50%)';
-        } else if (position === 'right') {
-            content.style.top = `${Math.min(targetRect.top, viewportHeight - 400)}px`;
-            content.style.left = `${targetRect.right + margin}px`;
-            // If too far right, move to left of target
-            if (targetRect.right + 420 > viewportWidth) {
-                content.style.left = '';
-                content.style.right = `${viewportWidth - targetRect.left + margin}px`;
-            }
-        } else if (position === 'left') {
-            content.style.top = `${Math.min(targetRect.top, viewportHeight - 400)}px`;
-            content.style.right = `${viewportWidth - targetRect.left + margin}px`;
-            // If too far left, move to right of target
-            if (targetRect.left < 420) {
-                content.style.right = '';
-                content.style.left = `${targetRect.right + margin}px`;
-            }
-        }
-    }
-
-    function clearHighlight() {
-        // Remove spotlight
-        tutorialSpotlight.classList.remove('active');
-        tutorialHighlightOverlay.classList.remove('active');
-
-        // Remove highlight class from all elements
-        document.querySelectorAll('.tutorial-highlight-target').forEach(el => {
-            el.classList.remove('tutorial-highlight-target');
-        });
-    }
-
-    function nextTutorialStep() {
-        if (tutorialCurrentStep < tutorialSteps.length - 1) {
-            tutorialCurrentStep++;
-            showTutorialStep(tutorialCurrentStep);
-        } else {
-            endTutorial();
-        }
-    }
-
-    function prevTutorialStep() {
-        if (tutorialCurrentStep > 0) {
-            tutorialCurrentStep--;
-            showTutorialStep(tutorialCurrentStep);
-        }
-    }
-
-    function endTutorial() {
-        clearHighlight();
-        tutorialModal.style.display = 'none';
-        localStorage.setItem('phoenix_tutorial_completed', 'true');
     }
 
     async function sendAction(actionData) {
@@ -365,8 +375,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const newState = await response.json();
             render(newState);
+            return newState;
         } catch (error) {
             console.error("Action failed:", error);
+            SoundSystem.play('error');
+            Toast.error('Action Failed', 'Could not communicate with server', 3000);
+            return null;
         }
     }
 
@@ -376,28 +390,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Rendering Logic ---
     function render(state) {
-        // Check for pending event FIRST (highest priority)
-        if (state.pending_event && eventModal.style.display !== 'flex') {
-            showEventModal(state.pending_event);
-            return; // Don't render rest until event is resolved
-        }
-
-        // Close event modal if no longer pending
-        if (!state.pending_event && eventModal.style.display === 'flex') {
-            eventModal.style.display = 'none';
-        }
-
-        // Check for Level Change (Transition Animation placeholder)
+        // Check for Level Change with celebration animation
         if (currentState && currentState.level < state.level) {
             const levelNames = {
+                1: "The Stabilizer",
                 2: "The First Way (Flow)",
                 3: "The Second Way (Feedback)",
-                4: "The Third Way (Culture)",
-                5: "Organizational Learning",
-                6: "Final Challenge"
+                4: "The Third Way (Continual Learning)"
             };
-            const newLevelName = levelNames[state.level] || `Level ${state.level}`;
-            alert(`CONGRATULATIONS! Level ${currentState.level} Complete.\nStarting Level ${state.level}: ${newLevelName}`);
+            Animator.showLevelUp(currentState.level, state.level, levelNames[state.level] || '');
         }
 
         currentState = state;
@@ -406,11 +407,6 @@ document.addEventListener('DOMContentLoaded', () => {
         levelDisplay.textContent = state.level;
         if (state.level === 1) levelTitle.textContent = "The Stabilizer";
         else if (state.level === 2) levelTitle.textContent = "The First Way (Flow)";
-        else if (state.level === 3) levelTitle.textContent = "The Second Way (Feedback)";
-        else if (state.level === 4) levelTitle.textContent = "The Third Way (Culture)";
-        else if (state.level === 5) levelTitle.textContent = "Organizational Learning";
-        else if (state.level === 6) levelTitle.textContent = "Final Challenge";
-        else levelTitle.textContent = `Level ${state.level}`;
 
         metricBudget.textContent = `$${state.budget.toLocaleString()}`;
         metricStability.textContent = `${state.stability}%`;
@@ -436,39 +432,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // 5. Logs
         renderLogs(state.mentor_log, state.chat_history);
 
-        // 6. Training Section (Level 2+)
-        renderTraining(state);
-
-        // 7. Velocity Chart
+        // 6. Velocity Chart
         renderVelocity(state.velocity_history || []);
-    }
-
-    function renderTraining(state) {
-        // Show training section only in Level 2+
-        if (state.level >= 2) {
-            trainingSection.style.display = 'block';
-        } else {
-            trainingSection.style.display = 'none';
-            return;
-        }
-
-        // Update training status
-        if (state.training_in_progress) {
-            const weeks = state.training_in_progress.weeks_remaining;
-            trainingStatus.innerHTML = `
-                <p class="training-active">Брент обучает стажера...</p>
-                <p class="training-countdown">${weeks} недель(и) осталось</p>
-            `;
-            trainBtn.disabled = true;
-            trainBtn.textContent = 'Training in Progress...';
-        } else {
-            trainingStatus.innerHTML = `
-                <p class="training-idle">Брент может обучить новых разработчиков.</p>
-                <p class="training-hint">Обучение займет 3 недели, но снизит зависимость от Брента.</p>
-            `;
-            trainBtn.disabled = false;
-            trainBtn.textContent = 'Train Developer (3 weeks)';
-        }
     }
 
     // --- Sprint Rendering ---
@@ -541,13 +506,6 @@ document.addEventListener('DOMContentLoaded', () => {
             sprintBtn.textContent = 'In Retro';
             sprintBtn.className = 'sprint-btn secondary';
         }
-
-        // Show/hide Daily Standup button
-        if (state.daily_standup_available && sprint.phase === 'active') {
-            standupBtn.style.display = 'block';
-        } else {
-            standupBtn.style.display = 'none';
-        }
     }
 
     function renderVelocity(velocityHistory) {
@@ -600,13 +558,26 @@ document.addEventListener('DOMContentLoaded', () => {
         wipLimit.textContent = limit;
         wipCurrent.textContent = tasks.in_progress.length;
 
-        // Highlight WIP violation or fullness
-        if (tasks.in_progress.length >= limit) {
+        // Highlight WIP violation or fullness with animations
+        if (tasks.in_progress.length > limit) {
             wipBadge.style.backgroundColor = '#ef4444'; // Red warning
             wipBadge.style.color = 'white';
+            wipBadge.classList.add('critical');
+            if (!window.wipWarned) {
+                SoundSystem.play('wipWarning');
+                Toast.warning('WIP Limit Exceeded!', `You have ${tasks.in_progress.length} items in progress (limit: ${limit})`, 4000);
+                window.wipWarned = true;
+            }
+        } else if (tasks.in_progress.length >= limit) {
+            wipBadge.style.backgroundColor = '#f59e0b'; // Orange warning
+            wipBadge.style.color = 'white';
+            wipBadge.classList.add('warning');
+            wipBadge.classList.remove('critical');
         } else {
             wipBadge.style.backgroundColor = '#334155'; // Default
             wipBadge.style.color = '#94a3b8';
+            wipBadge.classList.remove('warning', 'critical');
+            window.wipWarned = false;
         }
 
         // Clear columns
@@ -724,6 +695,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // Optimization: Don't send request if dropping in same column
                     if (newColId !== oldColId) {
+                        SoundSystem.play('taskMove');
+
+                        // Play different sound for completing tasks
+                        if (newColId === 'done') {
+                            SoundSystem.play('taskComplete');
+                        }
+
                         sendAction({
                             type: 'task_move',
                             task_id: taskId,
@@ -756,6 +734,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const resourceId = draggedElement.dataset.resourceId;
                 const taskId = card.dataset.taskId;
 
+                SoundSystem.play('resourceAssign');
+
                 sendAction({
                     type: 'assign_resource',
                     resource_id: resourceId,
@@ -775,19 +755,21 @@ document.addEventListener('DOMContentLoaded', () => {
             openPlanningModal();
         } else if (currentState.current_sprint.phase === 'planning') {
             // Launch the sprint
+            SoundSystem.play('sprintStart');
+            Toast.success('Sprint Started', 'Good luck with the sprint!', 3000);
             sendAction({ type: 'sprint_start' });
         } else if (currentState.current_sprint.phase === 'active') {
             // End sprint - go to review
+            SoundSystem.play('sprintEnd');
+            Toast.info('Sprint Ended', 'Time for the Sprint Review', 3000);
             sendAction({ type: 'sprint_end' });
         }
     }
 
-    function handleStandupClick() {
-        sendAction({ type: 'standup_trigger' });
-    }
-
     function openPlanningModal() {
         if (!currentState) return;
+
+        SoundSystem.play('modalOpen');
 
         // Clear previous inputs
         sprintGoalInput.value = '';
@@ -801,6 +783,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function closePlanningModal() {
+        SoundSystem.play('modalClose');
         planningModal.style.display = 'none';
     }
 
@@ -886,6 +869,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const goal = sprintGoalInput.value.trim();
         const duration = parseInt(sprintDuration.value);
 
+        SoundSystem.play('success');
+        Toast.success('Sprint Created', `"${goal || 'No goal'}" - ${duration} weeks`, 2500);
+
         await sendAction({
             type: 'sprint_create',
             goal: goal,
@@ -956,83 +942,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         retroModal.style.display = 'none';
 
+        SoundSystem.play('success');
+        Toast.success('Sprint Complete!', 'Retrospective saved. Great work!', 3000);
+
         await sendAction({
             type: 'sprint_complete_retro',
             notes: notes
         });
-    }
-
-    // --- Event System Functions ---
-
-    function showEventModal(event) {
-        // Set event data
-        eventTitle.textContent = event.title;
-        eventDescription.textContent = event.description;
-
-        // Set severity badge
-        eventSeverity.textContent = event.severity.toUpperCase();
-        eventSeverity.setAttribute('data-severity', event.severity);
-
-        // Set type badge
-        eventType.textContent = event.type.charAt(0).toUpperCase() + event.type.slice(1);
-
-        // Set modal border color based on severity
-        eventModal.setAttribute('data-severity', event.severity);
-
-        // Set icon based on event type
-        const typeIcons = {
-            'technical': '🔧',
-            'business': '💼',
-            'team': '👥',
-            'external': '🌐',
-            'random': '🎲'
-        };
-        eventIcon.textContent = typeIcons[event.type] || '🚨';
-
-        // Clear and populate choices
-        eventChoices.innerHTML = '';
-
-        event.choices.forEach(choice => {
-            const choiceBtn = document.createElement('button');
-            choiceBtn.className = 'event-choice';
-
-            // Build choice HTML
-            let choiceHtml = `<div class="event-choice-text">${choice.text}</div>`;
-
-            // Add consequence preview
-            const consequences = choice.consequences || {};
-            const previewParts = [];
-
-            for (const [key, value] of Object.entries(consequences)) {
-                if (value < 0) {
-                    previewParts.push(`<span class="negative">${key}: ${value}</span>`);
-                } else if (value > 0) {
-                    previewParts.push(`<span class="positive">${key}: +${value}</span>`);
-                }
-            }
-
-            if (previewParts.length > 0) {
-                choiceHtml += `<div class="event-choice-preview">${previewParts.join(' | ')}</div>`;
-            }
-
-            choiceBtn.innerHTML = choiceHtml;
-
-            // Add click handler
-            choiceBtn.onclick = () => handleEventChoice(choice.id);
-
-            eventChoices.appendChild(choiceBtn);
-        });
-
-        // Show modal
-        eventModal.style.display = 'flex';
-    }
-
-    async function handleEventChoice(choiceId) {
-        await sendAction({
-            type: 'event_choice',
-            choice_id: choiceId
-        });
-        // Modal will close on next render when pending_event is cleared
     }
 
     init();
