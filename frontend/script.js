@@ -46,10 +46,37 @@ document.addEventListener('DOMContentLoaded', () => {
     const reviewToRetroBtn = document.getElementById('review-to-retro');
     const retroModal = document.getElementById('retro-modal');
     const retroCompleteBtn = document.getElementById('retro-complete');
+    // Planning Poker Elements
+    const pokerModal = document.getElementById('poker-modal');
+    const pokerClose = document.getElementById('poker-close');
+    const pokerCancel = document.getElementById('poker-cancel');
+    const pokerApply = document.getElementById('poker-apply');
+    const pokerTaskTitle = document.getElementById('poker-task-title');
+    const pokerTaskDesc = document.getElementById('poker-task-desc');
+    const pokerCards = document.getElementById('poker-cards');
+    const pokerResults = document.getElementById('poker-results');
+    const pokerVotesDisplay = document.getElementById('poker-votes-display');
+    const pokerConsensus = document.getElementById('poker-consensus');
+    const pokerFinalValue = document.getElementById('poker-final-value');
+    // Quiz Elements
+    const quizModal = document.getElementById('quiz-modal');
+    const quizClose = document.getElementById('quiz-close');
+    const quizCancel = document.getElementById('quiz-cancel');
+    const quizNext = document.getElementById('quiz-next');
+    const quizScore = document.getElementById('quiz-score');
+    const quizTotal = document.getElementById('quiz-total');
+    const quizRemaining = document.getElementById('quiz-remaining');
+    const quizQuestion = document.getElementById('quiz-question');
+    const quizOptions = document.getElementById('quiz-options');
+    const quizQuestionContainer = document.getElementById('quiz-question-container');
+    const quizResult = document.getElementById('quiz-result');
+    const quizResultTitle = document.getElementById('quiz-result-title');
+    const quizExplanation = document.getElementById('quiz-explanation');
 
     // --- State Management ---
     let currentState = null;
     let planningSprintTasks = []; // Tasks selected during planning
+    let currentPokerTask = null; // Task currently being estimated with Planning Poker
 
     // --- Initialization ---
     function init() {
@@ -66,6 +93,16 @@ document.addEventListener('DOMContentLoaded', () => {
         planningConfirm.onclick = createSprint;
         reviewToRetroBtn.onclick = goToRetro;
         retroCompleteBtn.onclick = completeRetro;
+
+        // Planning Poker Event Listeners
+        pokerClose.onclick = closePokerModal;
+        pokerCancel.onclick = cancelPoker;
+        pokerApply.onclick = applyPokerEstimate;
+
+        // Quiz Event Listeners
+        quizClose.onclick = closeQuizModal;
+        quizCancel.onclick = closeQuizModal;
+        quizNext.onclick = startNextQuizQuestion;
 
         tabBtns.forEach(btn => {
             btn.addEventListener('click', () => {
@@ -151,6 +188,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 6. Velocity Chart
         renderVelocity(state.velocity_history || []);
+
+        // 7. Planning Poker
+        if (state.planning_poker) {
+            renderPokerModal(state.planning_poker);
+        }
+
+        // 8. Quiz
+        if (state.quiz) {
+            updateQuizUI(state.quiz);
+        }
     }
 
     // --- Sprint Rendering ---
@@ -327,6 +374,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span>${task.points} pts</span>
                         ${resourceSlotHtml}
                     </div>
+                    <button class="poker-btn" data-task-id="${task.id}" data-task-title="${task.title}" data-task-desc="${task.description || ''}">🎴 Planning Poker</button>
                 `;
 
                 if (isResourceNeeded && !assignedResId) {
@@ -632,6 +680,196 @@ document.addEventListener('DOMContentLoaded', () => {
             notes: notes
         });
     }
+
+    // --- Planning Poker Functions ---
+
+    function renderPokerModal(pokerState) {
+        // Set task info
+        pokerTaskTitle.textContent = pokerState.task_title;
+        pokerTaskDesc.textContent = currentPokerTask?.description || 'Estimate this task...';
+
+        // Render cards
+        pokerCards.innerHTML = pokerState.cards.map(card => `
+            <div class="poker-card" data-vote="${card}">
+                <span class="poker-card-value">${card}</span>
+            </div>
+        `).join('');
+
+        // Add click handlers to cards
+        pokerCards.querySelectorAll('.poker-card').forEach(cardEl => {
+            cardEl.onclick = () => {
+                const vote = parseInt(cardEl.dataset.vote);
+                submitPokerVote(vote);
+            };
+        });
+
+        // Show modal
+        if (pokerModal.style.display !== 'flex') {
+            pokerModal.style.display = 'flex';
+        }
+
+        // Show results if votes exist
+        if (pokerState.ai_votes && Object.keys(pokerState.ai_votes).length > 0) {
+            pokerResults.style.display = 'block';
+            renderPokerVotes(pokerState);
+        } else {
+            pokerResults.style.display = 'none';
+        }
+
+        // Show consensus if reached
+        if (pokerState.consensus_reached) {
+            pokerConsensus.style.display = 'block';
+            pokerFinalValue.textContent = pokerState.final_estimate;
+            pokerApply.style.display = 'inline-block';
+            // Disable card clicking after consensus
+            pokerCards.querySelectorAll('.poker-card').forEach(c => c.style.pointerEvents = 'none');
+        } else {
+            pokerConsensus.style.display = 'none';
+            pokerApply.style.display = 'none';
+            pokerCards.querySelectorAll('.poker-card').forEach(c => c.style.pointerEvents = 'auto');
+        }
+    }
+
+    function renderPokerVotes(pokerState) {
+        let html = '';
+
+        // Player vote
+        if (pokerState.player_vote !== null) {
+            html += `<div class="poker-vote-item player">
+                <span class="vote-name">Вы</span>
+                <span class="vote-value">${pokerState.player_vote}</span>
+            </div>`;
+        }
+
+        // AI votes
+        for (const [id, member] of Object.entries(pokerState.ai_votes)) {
+            html += `<div class="poker-vote-item">
+                <span class="vote-name">${member.name}</span>
+                <span class="vote-value">${member.vote}</span>
+            </div>`;
+        }
+
+        pokerVotesDisplay.innerHTML = html;
+    }
+
+    async function submitPokerVote(vote) {
+        await sendAction({
+            type: 'poker_vote',
+            vote: vote
+        });
+    }
+
+    async function applyPokerEstimate() {
+        await sendAction({ type: 'poker_apply' });
+        closePokerModal();
+    }
+
+    async function cancelPoker() {
+        await sendAction({ type: 'poker_cancel' });
+        closePokerModal();
+    }
+
+    function closePokerModal() {
+        pokerModal.style.display = 'none';
+        currentPokerTask = null;
+    }
+
+    // Add event delegation for Planning Poker buttons on task cards
+    document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('poker-btn')) {
+            e.stopPropagation();
+            const taskId = e.target.dataset.taskId;
+            const taskTitle = e.target.dataset.taskTitle;
+            const taskDesc = e.target.dataset.taskDesc;
+
+            // Find the full task object
+            for (const col of Object.values(currentState?.tasks || {})) {
+                const task = col.find(t => t.id === taskId);
+                if (task) {
+                    currentPokerTask = task;
+                    break;
+                }
+            }
+
+            // Start Planning Poker session
+            sendAction({
+                type: 'poker_start',
+                task_id: taskId
+            });
+        }
+    });
+
+    // --- Quiz Functions ---
+
+    function updateQuizUI(quizState) {
+        // Update score display
+        quizScore.textContent = quizState.score || 0;
+        quizTotal.textContent = quizState.total_answered || 0;
+        quizRemaining.textContent = quizState.remaining || 8;
+
+        // If there's an active question, show it
+        if (quizState.current_question) {
+            showQuizQuestion(quizState.current_question);
+        }
+    }
+
+    function showQuizQuestion(question) {
+        quizModal.style.display = 'flex';
+        quizQuestion.textContent = question.question;
+        quizQuestionContainer.style.display = 'block';
+        quizResult.style.display = 'none';
+        quizNext.style.display = 'none';
+
+        // Render options
+        quizOptions.innerHTML = question.options.map((option, index) => `
+            <button class="quiz-option-btn" data-index="${index}">
+                <span class="quiz-option-letter">${String.fromCharCode(65 + index)}</span>
+                <span class="quiz-option-text">${option}</span>
+            </button>
+        `).join('');
+
+        // Add click handlers
+        quizOptions.querySelectorAll('.quiz-option-btn').forEach(btn => {
+            btn.onclick = () => {
+                const answerIndex = parseInt(btn.dataset.index);
+                submitQuizAnswer(answerIndex);
+            };
+        });
+    }
+
+    async function submitQuizAnswer(answerIndex) {
+        await sendAction({
+            type: 'quiz_submit_answer',
+            answer_index: answerIndex
+        });
+    }
+
+    async function startNextQuizQuestion() {
+        await sendAction({ type: 'quiz_start' });
+    }
+
+    function closeQuizModal() {
+        quizModal.style.display = 'none';
+    }
+
+    // Add quiz start button to mentor panel
+    function addQuizButtonToMentor() {
+        const mentorTab = document.getElementById('mentor-tab');
+        if (!mentorTab || document.getElementById('start-quiz-btn')) return;
+
+        const quizBtn = document.createElement('button');
+        quizBtn.id = 'start-quiz-btn';
+        quizBtn.className = 'quiz-start-btn';
+        quizBtn.textContent = '🧠 Start Quiz';
+        quizBtn.onclick = async () => {
+            await sendAction({ type: 'quiz_start' });
+        };
+
+        mentorTab.insertBefore(quizBtn, mentorTab.querySelector('.log-scroll'));
+    }
+
+    // Add quiz button after initial render
+    setTimeout(addQuizButtonToMentor, 500);
 
     init();
 });
