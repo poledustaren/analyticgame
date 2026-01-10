@@ -46,10 +46,166 @@ document.addEventListener('DOMContentLoaded', () => {
     const reviewToRetroBtn = document.getElementById('review-to-retro');
     const retroModal = document.getElementById('retro-modal');
     const retroCompleteBtn = document.getElementById('retro-complete');
+    // Progress Indicators
+    const levelProgressBar = document.getElementById('level-progress-bar');
+    const levelProgressText = document.getElementById('level-progress-text');
+    const achievementsContainer = document.getElementById('achievements-container');
+    const toastContainer = document.getElementById('toast-container');
 
     // --- State Management ---
     let currentState = null;
     let planningSprintTasks = []; // Tasks selected during planning
+    let earnedAchievements = new Set(); // Track earned achievements
+
+    // --- Toast Notification System ---
+    const toastIcons = {
+        success: '✓',
+        warning: '⚠',
+        error: '✕',
+        info: 'ℹ',
+        'level-up': '🎉',
+        'task-complete': '✅',
+        'sprint-start': '🚀',
+        'sprint-end': '🏁',
+        'achievement': '🏆'
+    };
+
+    function showToast(title, message, type = 'info', duration = 4000) {
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+
+        toast.innerHTML = `
+            <span class="toast-icon">${toastIcons[type] || toastIcons.info}</span>
+            <div class="toast-content">
+                <div class="toast-title">${title}</div>
+                <div class="toast-message">${message}</div>
+            </div>
+            <button class="toast-close">&times;</button>
+        `;
+
+        toastContainer.appendChild(toast);
+
+        // Auto-remove after duration
+        const timeout = setTimeout(() => removeToast(toast), duration);
+
+        // Close button handler
+        toast.querySelector('.toast-close').onclick = () => {
+            clearTimeout(timeout);
+            removeToast(toast);
+        };
+    }
+
+    function removeToast(toast) {
+        toast.classList.add('removing');
+        setTimeout(() => toast.remove(), 300);
+    }
+
+    // --- Achievement System ---
+    function addAchievement(id, icon, text, badgeClass = '') {
+        if (earnedAchievements.has(id)) return;
+
+        earnedAchievements.add(id);
+
+        // Remove "no achievements" message if present
+        const noAchievements = achievementsContainer.querySelector('.no-achievements');
+        if (noAchievements) noAchievements.remove();
+
+        const badge = document.createElement('div');
+        badge.className = `achievement-badge ${badgeClass}`;
+        badge.innerHTML = `
+            <span class="badge-icon">${icon}</span>
+            <span class="badge-text">${text}</span>
+        `;
+
+        achievementsContainer.appendChild(badge);
+
+        // Show toast for new achievement
+        showToast('Achievement Unlocked!', text, 'achievement', 5000);
+    }
+
+    function renderAchievements(state) {
+        // Check for achievements based on state
+
+        // Level completion achievement
+        if (state.level >= 2 && !earnedAchievements.has('level-1-complete')) {
+            addAchievement('level-1-complete', '🎯', 'Level 1 Complete', 'level-complete');
+        }
+        if (state.level >= 3 && !earnedAchievements.has('level-2-complete')) {
+            addAchievement('level-2-complete', '⭐', 'Level 2 Complete', 'level-complete');
+        }
+
+        // Sprint completion achievement
+        const velocityHistory = state.velocity_history || [];
+        if (velocityHistory.length >= 1 && !earnedAchievements.has('first-sprint')) {
+            addAchievement('first-sprint', '🏁', 'First Sprint', 'sprint-complete');
+        }
+        if (velocityHistory.length >= 3 && !earnedAchievements.has('sprint-veteran')) {
+            addAchievement('sprint-veteran', '🎖️', 'Sprint Veteran', 'sprint-complete');
+        }
+
+        // High velocity achievement (100% sprint completion)
+        if (velocityHistory.length > 0) {
+            const lastSprint = velocityHistory[velocityHistory.length - 1];
+            if (lastSprint.planned > 0 && lastSprint.actual >= lastSprint.planned) {
+                if (!earnedAchievements.has('perfect-sprint')) {
+                    addAchievement('perfect-sprint', '💯', 'Perfect Sprint', 'goal-complete');
+                }
+            }
+        }
+
+        // Stability achievement
+        if (state.stability >= 80 && !earnedAchievements.has('stable-team')) {
+            addAchievement('stable-team', '🛡️', 'Stable Team', 'goal-complete');
+        }
+
+        // Low unplanned work achievement
+        if (state.unplanned_work <= 20 && !earnedAchievements.has('under-control')) {
+            addAchievement('under-control', '✨', 'Under Control', 'goal-complete');
+        }
+    }
+
+    // --- Level Progress Rendering ---
+    function renderLevelProgress(state) {
+        // Determine level goal based on level
+        let current = 0;
+        let goal = 3;
+        let goalText = 'unplanned tasks';
+
+        if (state.level === 1) {
+            // Level 1: Complete 3 unplanned tasks
+            const doneTasks = state.tasks?.done || [];
+            current = doneTasks.filter(t => t.type === 'unplanned').length;
+            goal = 3;
+            goalText = 'unplanned tasks';
+        } else if (state.level === 2) {
+            // Level 2: Achieve 80% stability
+            current = Math.round(state.stability);
+            goal = 80;
+            goalText = 'stability';
+        } else {
+            // Generic: show sprint completion progress
+            const velocityHistory = state.velocity_history || [];
+            current = velocityHistory.length;
+            goal = 5;
+            goalText = 'sprints completed';
+        }
+
+        // Calculate percentage
+        const percentage = Math.min(100, Math.round((current / goal) * 100));
+
+        // Update progress bar
+        levelProgressBar.style.width = `${percentage}%`;
+        levelProgressText.textContent = `${current}/${goal}`;
+
+        // Color coding based on progress
+        if (percentage >= 100) {
+            levelProgressBar.style.background = 'var(--accent-success)';
+        } else if (percentage >= 50) {
+            levelProgressBar.style.background = 'linear-gradient(90deg, var(--accent-primary), var(--accent-success))';
+        } else {
+            levelProgressBar.style.background = 'linear-gradient(90deg, var(--accent-warning), var(--accent-primary))';
+        }
+    }
 
     // --- Initialization ---
     function init() {
@@ -101,9 +257,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(actionData),
             });
             const newState = await response.json();
+
+            // Toast notifications for specific actions
+            if (actionData.type === 'task_move' && actionData.new_column_id === 'done') {
+                showToast('Task Complete!', 'Great work! Keep it up.', 'task-complete', 3000);
+            } else if (actionData.type === 'assign_resource') {
+                showToast('Resource Assigned', 'Brent is now working on this task.', 'info', 2000);
+            } else if (actionData.type === 'sprint_complete_retro') {
+                showToast('Sprint Complete!', 'Congratulations on finishing the sprint!', 'success', 4000);
+            }
+
             render(newState);
         } catch (error) {
             console.error("Action failed:", error);
+            showToast('Action Failed', 'Could not complete the action. Please try again.', 'error', 4000);
         }
     }
 
@@ -115,7 +282,25 @@ document.addEventListener('DOMContentLoaded', () => {
     function render(state) {
         // Check for Level Change (Transition Animation placeholder)
         if (currentState && currentState.level < state.level) {
-            alert(`CONGRATULATIONS! Level ${currentState.level} Complete.\nStarting Level ${state.level}: The First Way (Flow)`);
+            showToast(
+                `Level ${currentState.level} Complete!`,
+                `Starting Level ${state.level}: ${state.level === 2 ? 'The First Way (Flow)' : 'Next Challenge'}`,
+                'level-up',
+                6000
+            );
+        }
+
+        // Check for sprint phase changes
+        if (currentState && currentState.current_sprint && state.current_sprint) {
+            if (currentState.current_sprint.phase !== state.current_sprint.phase) {
+                if (state.current_sprint.phase === 'active') {
+                    showToast('Sprint Started!', `Sprint ${state.current_sprint.id}: "${state.current_sprint.goal}"`, 'sprint-start');
+                } else if (state.current_sprint.phase === 'review') {
+                    showToast('Sprint Ended!', `Time to review Sprint ${state.current_sprint.id}`, 'sprint-end');
+                } else if (state.current_sprint.phase === 'retro') {
+                    showToast('Sprint Review Complete!', 'Let\'s reflect on what went well', 'info');
+                }
+            }
         }
 
         currentState = state;
@@ -140,6 +325,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // 2. Sprint UI
         renderSprint(state);
 
+        // 2.1 Level Progress
+        renderLevelProgress(state);
+
         // 3. Resources (Brent)
         renderResources(state.resources);
 
@@ -151,6 +339,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 6. Velocity Chart
         renderVelocity(state.velocity_history || []);
+
+        // 7. Achievements
+        renderAchievements(state);
     }
 
     // --- Sprint Rendering ---
@@ -396,6 +587,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     const newColId = col.dataset.columnId;
                     const taskId = draggedElement.dataset.taskId;
                     const oldColId = draggedElement.dataset.colId;
+
+                    // WIP Limit check for in_progress column
+                    if (newColId === 'in_progress' && currentState) {
+                        const currentWip = currentState.tasks?.in_progress?.length || 0;
+                        const wipLimit = currentState.wip_limit || 3;
+                        if (currentWip >= wipLimit) {
+                            showToast('WIP Limit Reached!', `Maximum ${wipLimit} tasks allowed in progress.`, 'warning', 4000);
+                            return;
+                        }
+                    }
 
                     // Optimization: Don't send request if dropping in same column
                     if (newColId !== oldColId) {
