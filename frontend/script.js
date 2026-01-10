@@ -59,6 +59,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const tutorialSpotlight = document.getElementById('tutorial-spotlight');
     const tutorialHighlightOverlay = document.getElementById('tutorial-highlight-overlay');
 
+    // Event Modal Elements
+    const eventModal = document.getElementById('event-modal');
+    const eventTitle = document.getElementById('event-title');
+    const eventIcon = document.getElementById('event-icon');
+    const eventDescription = document.getElementById('event-description');
+    const eventSeverity = document.getElementById('event-severity');
+    const eventType = document.getElementById('event-type');
+    const eventChoices = document.getElementById('event-choices');
+
     // --- State Management ---
     let currentState = null;
     let planningSprintTasks = []; // Tasks selected during planning
@@ -350,6 +359,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Rendering Logic ---
     function render(state) {
+        // Check for pending event FIRST (highest priority)
+        if (state.pending_event && eventModal.style.display !== 'flex') {
+            showEventModal(state.pending_event);
+            return; // Don't render rest until event is resolved
+        }
+
+        // Close event modal if no longer pending
+        if (!state.pending_event && eventModal.style.display === 'flex') {
+            eventModal.style.display = 'none';
+        }
+
         // Check for Level Change (Transition Animation placeholder)
         if (currentState && currentState.level < state.level) {
             alert(`CONGRATULATIONS! Level ${currentState.level} Complete.\nStarting Level ${state.level}: The First Way (Flow)`);
@@ -879,6 +899,79 @@ document.addEventListener('DOMContentLoaded', () => {
             type: 'sprint_complete_retro',
             notes: notes
         });
+    }
+
+    // --- Event System Functions ---
+
+    function showEventModal(event) {
+        // Set event data
+        eventTitle.textContent = event.title;
+        eventDescription.textContent = event.description;
+
+        // Set severity badge
+        eventSeverity.textContent = event.severity.toUpperCase();
+        eventSeverity.setAttribute('data-severity', event.severity);
+
+        // Set type badge
+        eventType.textContent = event.type.charAt(0).toUpperCase() + event.type.slice(1);
+
+        // Set modal border color based on severity
+        eventModal.setAttribute('data-severity', event.severity);
+
+        // Set icon based on event type
+        const typeIcons = {
+            'technical': '🔧',
+            'business': '💼',
+            'team': '👥',
+            'external': '🌐',
+            'random': '🎲'
+        };
+        eventIcon.textContent = typeIcons[event.type] || '🚨';
+
+        // Clear and populate choices
+        eventChoices.innerHTML = '';
+
+        event.choices.forEach(choice => {
+            const choiceBtn = document.createElement('button');
+            choiceBtn.className = 'event-choice';
+
+            // Build choice HTML
+            let choiceHtml = `<div class="event-choice-text">${choice.text}</div>`;
+
+            // Add consequence preview
+            const consequences = choice.consequences || {};
+            const previewParts = [];
+
+            for (const [key, value] of Object.entries(consequences)) {
+                if (value < 0) {
+                    previewParts.push(`<span class="negative">${key}: ${value}</span>`);
+                } else if (value > 0) {
+                    previewParts.push(`<span class="positive">${key}: +${value}</span>`);
+                }
+            }
+
+            if (previewParts.length > 0) {
+                choiceHtml += `<div class="event-choice-preview">${previewParts.join(' | ')}</div>`;
+            }
+
+            choiceBtn.innerHTML = choiceHtml;
+
+            // Add click handler
+            choiceBtn.onclick = () => handleEventChoice(choice.id);
+
+            eventChoices.appendChild(choiceBtn);
+        });
+
+        // Show modal
+        eventModal.style.display = 'flex';
+    }
+
+    async function handleEventChoice(choiceId) {
+        await sendAction({
+            type: 'event_choice',
+            choice_id: choiceId
+        });
+        // Modal will close on next render when pending_event is cleared
     }
 
     init();
