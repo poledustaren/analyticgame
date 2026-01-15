@@ -332,6 +332,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const pokerConsensus = document.getElementById('poker-consensus');
     const pokerFinalValue = document.getElementById('poker-final-value');
     const pokerMessage = document.getElementById('poker-message');
+
+    // Event Modal Elements
+    const eventModal = document.getElementById('event-modal');
+    const eventTitle = document.getElementById('event-title');
+    const eventDescription = document.getElementById('event-description');
+    const eventIcon = document.getElementById('event-icon');
+    const eventTypeBadge = document.getElementById('event-type-badge');
+    const eventSeverityBadge = document.getElementById('event-severity-badge');
+    const eventChoices = document.getElementById('event-choices');
     // Progress Indicators
     const levelProgressBar = document.getElementById('level-progress-bar');
     const levelProgressText = document.getElementById('level-progress-text');
@@ -597,6 +606,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 7. Achievements
         renderAchievements(state);
+
+        // 8. Check for pending events
+        checkForPendingEvent(state);
     }
 
     // --- Sprint Rendering ---
@@ -1331,6 +1343,177 @@ document.addEventListener('DOMContentLoaded', () => {
             SoundSystem.play('taskMove');
         };
     });
+
+    // --- Event Modal Functions ---
+
+    function showEventModal(event) {
+        if (!event) return;
+
+        SoundSystem.play('modalOpen');
+
+        // Update modal content
+        eventTitle.textContent = event.title;
+        eventDescription.textContent = event.description;
+        eventIcon.textContent = extractEventIcon(event.title);
+
+        // Update badges
+        eventTypeBadge.textContent = event.type || 'EVENT';
+        eventTypeBadge.setAttribute('data-type', event.type || 'random');
+
+        eventSeverityBadge.textContent = event.severity || 'MEDIUM';
+        eventSeverityBadge.setAttribute('data-severity', (event.severity || 'medium').toLowerCase());
+
+        // Add critical class if severity is critical
+        if (event.severity === 'critical' || event.severity === 'CRITICAL') {
+            eventModal.classList.add('critical');
+        } else {
+            eventModal.classList.remove('critical');
+        }
+
+        // Render choices
+        renderEventChoices(event.choices || []);
+
+        // Show modal
+        eventModal.style.display = 'flex';
+    }
+
+    function extractEventIcon(title) {
+        // Extract emoji from title if present
+        const emojiMatch = title.match(/^([\p{Emoji}\u200d]+)\s/u);
+        if (emojiMatch) return emojiMatch[1];
+
+        // Default icons based on event type keywords
+        const iconMap = {
+            'bug': '🐛',
+            'fire': '🔥',
+            'deployment': '🚀',
+            'requirement': '📝',
+            'deadline': '⏰',
+            'feature': '✨',
+            'team': '👥',
+            'sick': '🤒',
+            'conflict': '😤',
+            'morale': '😔',
+            'vendor': '📦',
+            'security': '🔒',
+            'server': '🖥️',
+            'outage': '🔴',
+            'audit': '📋'
+        };
+
+        const lowerTitle = title.toLowerCase();
+        for (const [keyword, icon] of Object.entries(iconMap)) {
+            if (lowerTitle.includes(keyword)) return icon;
+        }
+
+        return '⚠️'; // Default icon
+    }
+
+    function renderEventChoices(choices) {
+        eventChoices.innerHTML = '';
+
+        choices.forEach((choice, index) => {
+            const choiceEl = document.createElement('div');
+            choiceEl.className = 'event-choice';
+            choiceEl.dataset.choiceId = choice.id;
+
+            // Extract icon from choice text if present
+            const iconMatch = choice.text.match(/^([\p{Emoji}\u200d]+)\s/u);
+            const choiceIcon = iconMatch ? iconMatch[1] : '';
+            const choiceText = iconMatch ? choice.text.substring(2) : choice.text;
+
+            // Build choice HTML
+            let html = `
+                <div class="event-choice-text">
+                    ${choiceIcon ? `<span class="event-choice-icon">${choiceIcon}</span>` : ''}
+                    <span>${choiceText}</span>
+                </div>
+            `;
+
+            // Add consequences if available
+            if (choice.consequences && Object.keys(choice.consequences).length > 0) {
+                html += '<div class="event-choice-consequences">';
+
+                for (const [key, value] of Object.entries(choice.consequences)) {
+                    const consequenceClass = value > 0 ? 'positive' : value < 0 ? 'negative' : 'neutral';
+                    const sign = value > 0 ? '+' : '';
+                    const label = formatConsequenceKey(key);
+
+                    html += `<span class="event-consequence ${consequenceClass}">${label}: ${sign}${value}</span>`;
+                }
+
+                html += '</div>';
+            }
+
+            choiceEl.innerHTML = html;
+
+            // Add click handler
+            choiceEl.onclick = () => handleEventChoice(choice.id, choiceEl);
+
+            eventChoices.appendChild(choiceEl);
+        });
+    }
+
+    function formatConsequenceKey(key) {
+        const labels = {
+            'budget': '💰 Budget',
+            'stability': '📊 Stability',
+            'unplanned_work': '🔥 Unplanned',
+            'morale': '😊 Morale',
+            'wip_limit': '📏 WIP Limit',
+            'knowledge': '📚 Knowledge'
+        };
+        return labels[key] || key;
+    }
+
+    async function handleEventChoice(choiceId, choiceEl) {
+        // Add selecting animation
+        choiceEl.classList.add('selecting');
+
+        // Disable all choices to prevent multiple selections
+        eventChoices.querySelectorAll('.event-choice').forEach(el => {
+            el.style.pointerEvents = 'none';
+            el.style.opacity = el === choiceEl ? '1' : '0.5';
+        });
+
+        SoundSystem.play('success');
+
+        // Send choice to backend
+        const newState = await sendAction({
+            type: 'event_choice',
+            choice_id: choiceId
+        });
+
+        // Close modal after a short delay to show the selection
+        setTimeout(() => {
+            SoundSystem.play('modalClose');
+            eventModal.style.display = 'none';
+
+            // Reset choice styles
+            eventChoices.querySelectorAll('.event-choice').forEach(el => {
+                el.style.pointerEvents = '';
+                el.style.opacity = '';
+                el.classList.remove('selecting');
+            });
+        }, 300);
+    }
+
+    function closeEventModal() {
+        SoundSystem.play('modalClose');
+        eventModal.style.display = 'none';
+    }
+
+    // Check for pending events in state
+    function checkForPendingEvent(state) {
+        if (state.pending_event) {
+            // Small delay to ensure render completes first
+            setTimeout(() => {
+                showEventModal(state.pending_event);
+            }, 100);
+            return true;
+        }
+        return false;
+    }
 
     init();
 });
