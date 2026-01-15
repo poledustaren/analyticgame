@@ -19,15 +19,12 @@
 
             <div class="sidebar-section">
                 <h3>LEVEL <span id="level-display">1</span></h3>
-                <p class="level-title">The Stabilizer</p>
-                <!-- Level Progress Bar -->
-                <div class="level-progress-container">
-                    <div class="level-progress-label">
-                        <span>Progress</span>
-                        <span id="level-progress-text">0/3</span>
-                    </div>
-                    <div class="level-progress-bar-bg">
-                        <div class="level-progress-bar-fill" id="level-progress-bar" style="width: 0%;"></div>
+                <p class="level-title" id="level-title">The Stabilizer</p>
+                <!-- Level Goals -->
+                <div class="level-goals-container">
+                    <h4 class="goals-title">GOALS</h4>
+                    <div id="level-goals-list" class="level-goals-list">
+                        <!-- Goals will be rendered here -->
                     </div>
                 </div>
             </div>
@@ -532,6 +529,45 @@
                 <div class="event-choices" id="event-choices">
                     <!-- Choices will be dynamically inserted here -->
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LEVEL COMPLETE MODAL -->
+    <div id="level-complete-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content level-complete-modal">
+            <div class="modal-header level-complete-header">
+                <h2>🎉 LEVEL COMPLETE!</h2>
+            </div>
+            <div class="modal-body">
+                <div class="level-complete-icon">🏆</div>
+                <h3 id="level-complete-title">Level 1 Complete!</h3>
+                <p id="level-complete-message" class="level-complete-message">All goals achieved!</p>
+
+                <div class="level-complete-stats">
+                    <div class="stat-row">
+                        <span class="stat-label">Week Completed:</span>
+                        <span class="stat-value" id="level-complete-week">1</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Stability:</span>
+                        <span class="stat-value" id="level-complete-stability">80%</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Tasks Done:</span>
+                        <span class="stat-value" id="level-complete-tasks">3</span>
+                    </div>
+                </div>
+
+                <div class="level-complete-goals">
+                    <h4>Goals Achieved:</h4>
+                    <ul id="level-complete-goals-list">
+                        <!-- Goals will be listed here -->
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn primary" id="level-complete-advance">Continue to Next Level</button>
             </div>
         </div>
     </div>

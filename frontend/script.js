@@ -281,7 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const appLayout = document.getElementById('app-layout');
     // Sidebar
     const levelDisplay = document.getElementById('level-display');
-    const levelTitle = document.querySelector('.level-title');
+    const levelTitle = document.getElementById('level-title');
     const resourcePool = document.getElementById('resource-pool');
     const newGameBtn = document.getElementById('new-game-btn');
     const saveGameBtn = document.getElementById('save-game-btn');
@@ -342,8 +342,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const eventSeverityBadge = document.getElementById('event-severity-badge');
     const eventChoices = document.getElementById('event-choices');
     // Progress Indicators
-    const levelProgressBar = document.getElementById('level-progress-bar');
-    const levelProgressText = document.getElementById('level-progress-text');
     const achievementsContainer = document.getElementById('achievements-container');
     const toastContainer = document.getElementById('toast-container');
 
@@ -423,45 +421,82 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Level Progress Rendering ---
     function renderLevelProgress(state) {
-        // Determine level goal based on level
-        let current = 0;
-        let goal = 3;
-        let goalText = 'unplanned tasks';
+        // Update level display and title
+        levelDisplay.textContent = state.level;
 
-        if (state.level === 1) {
-            // Level 1: Complete 3 unplanned tasks
-            const doneTasks = state.tasks?.done || [];
-            current = doneTasks.filter(t => t.type === 'unplanned').length;
-            goal = 3;
-            goalText = 'unplanned tasks';
-        } else if (state.level === 2) {
-            // Level 2: Achieve 80% stability
-            current = Math.round(state.stability);
-            goal = 80;
-            goalText = 'stability';
-        } else {
-            // Generic: show sprint completion progress
-            const velocityHistory = state.velocity_history || [];
-            current = velocityHistory.length;
-            goal = 5;
-            goalText = 'sprints completed';
+        const titles = {
+            1: 'The Stabilizer',
+            2: 'The Visualizer',
+            3: 'The Feedback Loop',
+            4: 'The Teacher',
+            5: 'The Experimenter',
+            6: 'The Master'
+        };
+        levelTitle.textContent = titles[state.level] || `Level ${state.level}`;
+
+        // Render level goals
+        renderLevelGoals(state);
+
+        // Check for level complete
+        if (state.level_complete) {
+            showLevelCompleteModal(state.level_complete);
+        }
+    }
+
+    function renderLevelGoals(state) {
+        const goalsList = document.getElementById('level-goals-list');
+        if (!goalsList) return;
+
+        const goals = state.level_goals || [];
+
+        if (goals.length === 0) {
+            goalsList.innerHTML = '<p class="no-goals">No active goals</p>';
+            return;
         }
 
-        // Calculate percentage
-        const percentage = Math.min(100, Math.round((current / goal) * 100));
+        goalsList.innerHTML = goals.map(goal => {
+            const percentage = Math.min(100, Math.round((goal.current / goal.target) * 100));
+            const isComplete = goal.completed;
 
-        // Update progress bar
-        levelProgressBar.style.width = `${percentage}%`;
-        levelProgressText.textContent = `${current}/${goal}`;
+            return `
+                <div class="level-goal-item ${isComplete ? 'completed' : ''}">
+                    <span class="level-goal-icon">${goal.icon}</span>
+                    <div class="level-goal-content">
+                        <div class="level-goal-description">${goal.description}</div>
+                        <div class="level-goal-progress">
+                            <div class="level-goal-bar">
+                                <div class="level-goal-bar-fill" style="width: ${percentage}%"></div>
+                            </div>
+                            <span class="level-goal-text">${goal.current}/${goal.target}</span>
+                        </div>
+                    </div>
+                    <div class="level-goal-check">${isComplete ? '✓' : ''}</div>
+                </div>
+            `;
+        }).join('');
+    }
 
-        // Color coding based on progress
-        if (percentage >= 100) {
-            levelProgressBar.style.background = 'var(--accent-success)';
-        } else if (percentage >= 50) {
-            levelProgressBar.style.background = 'linear-gradient(90deg, var(--accent-primary), var(--accent-success))';
-        } else {
-            levelProgressBar.style.background = 'linear-gradient(90deg, var(--accent-warning), var(--accent-primary))';
-        }
+    function showLevelCompleteModal(levelComplete) {
+        const modal = document.getElementById('level-complete-modal');
+        if (!modal) return;
+
+        document.getElementById('level-complete-title').textContent = `Level ${levelComplete.level} Complete!`;
+        document.getElementById('level-complete-week').textContent = levelComplete.stats.week;
+        document.getElementById('level-complete-stability').textContent = `${levelComplete.stats.stability}%`;
+        document.getElementById('level-complete-tasks').textContent = levelComplete.stats.tasks_done;
+
+        const goalsList = document.getElementById('level-complete-goals-list');
+        goalsList.innerHTML = levelComplete.stats.goals.map(g => `<li>${g}</li>`).join('');
+
+        SoundSystem.play('levelUp');
+        modal.style.display = 'flex';
+    }
+
+    async function handleLevelCompleteAdvance() {
+        const modal = document.getElementById('level-complete-modal');
+        modal.style.display = 'none';
+
+        await sendAction({ type: 'level_complete_advance' });
     }
 
     // --- CI/CD Pipeline Handlers (Level 3+) ---
@@ -632,6 +667,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pipelineAdvanceBtn) pipelineAdvanceBtn.onclick = handlePipelineAdvance;
         if (pipelineResetBtn) pipelineResetBtn.onclick = handlePipelineReset;
         if (pipelineAutomateBtn) pipelineAutomateBtn.onclick = handlePipelineAutomate;
+
+        // Level Complete Modal
+        const levelCompleteAdvanceBtn = document.getElementById('level-complete-advance');
+        if (levelCompleteAdvanceBtn) levelCompleteAdvanceBtn.onclick = handleLevelCompleteAdvance;
 
         tabBtns.forEach(btn => {
             btn.addEventListener('click', () => {
@@ -1180,7 +1219,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
+                // Check if task is in current sprint
+                const isInSprint = currentState?.current_sprint?.task_ids?.includes(task.id);
+                const sprintBadge = isInSprint ? '<span class="sprint-task-badge">SPRINT</span>' : '';
+
                 card.innerHTML = `
+                    ${sprintBadge}
                     <h4>${task.title}</h4>
                     <p style="font-size:11px; color:#ccc;">${task.description || ''}</p>
                     <div class="task-meta">
@@ -1275,6 +1319,25 @@ document.addEventListener('DOMContentLoaded', () => {
                             showToast('WIP Limit Reached!', `Maximum ${wipLimit} tasks allowed in progress.`, 'warning', 4000);
                             return;
                         }
+                    }
+
+                    // Sprint validation: cannot move non-sprint task to in_progress during active sprint
+                    if (newColId === 'in_progress' && currentState?.current_sprint) {
+                        const sprintPhase = currentState.current_sprint.phase;
+                        const sprintTaskIds = currentState.current_sprint.task_ids || [];
+
+                        // Only block during ACTIVE phase, not PLANNING
+                        if (sprintPhase === 'active' && !sprintTaskIds.includes(taskId)) {
+                            SoundSystem.play('error');
+                            Toast.error('Sprint in Progress', 'Only sprint tasks can be moved to In Progress during active sprint!', 4000);
+                            return;
+                        }
+                    }
+
+                    // Warning when moving task from done back
+                    if (oldColId === 'done' && newColId !== 'done') {
+                        SoundSystem.play('wipWarning');
+                        Toast.warning('Moving from Done', 'Task is being moved back from Done. Is this a hotfix?', 3000);
                     }
 
                     // Optimization: Don't send request if dropping in same column

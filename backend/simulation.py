@@ -767,6 +767,10 @@ class GameState:
         # Level Up State
         self.level_up = None  # {'from': int, 'to': int, 'message': str} or None
 
+        # Level Goals - objectives to complete current level
+        self.level_goals = []  # List of {'id': str, 'description': str, 'current': int, 'target': int, 'completed': bool}
+        self.level_complete = None  # {'level': int, 'message': str, 'stats': dict} or None - shows modal when level is done
+
         # Sprint System
         self.current_sprint = None
         self.sprint_history = []
@@ -1525,6 +1529,7 @@ class SimulationEngine:
         action_type = action.get('type')
 
         if action_type == 'event_choice': self._handle_event_choice(action)
+        elif action_type == 'level_complete_advance': self._handle_level_complete_advance(action)
         elif action_type == 'quiz_answer': self._handle_quiz_answer(action)
         elif action_type == 'task_move': self._handle_task_move(action)
         elif action_type == 'set_wip_limit': self._handle_set_wip_limit(action)
@@ -1558,14 +1563,143 @@ class SimulationEngine:
         elif action_type == 'pipeline_automate': self._handle_pipeline_automate(action)
 
         self._check_level_transition()
+        self._update_level_goals()
         self._try_trigger_event()
         return self.get_current_state()
+
+    # --- Level Goals System ---
+
+    def _set_level_goals(self, goals):
+        """Установить цели для текущего уровня."""
+        state = self.active_game_state
+        state.level_goals = []
+        for goal in goals:
+            state.level_goals.append({
+                'id': goal['id'],
+                'description': goal['description'],
+                'current': 0,
+                'target': goal['target'],
+                'completed': False,
+                'icon': goal.get('icon', '🎯')
+            })
+
+    def _update_level_goals(self):
+        """Обновить прогресс по goals на основе текущего состояния."""
+        state = self.active_game_state
+        if not state.level_goals:
+            return
+
+        all_complete = True
+
+        for goal in state.level_goals:
+            if goal['completed']:
+                continue
+
+            goal_id = goal['id']
+            target = goal['target']
+            current = 0
+
+            if goal_id == 'unplanned_done':
+                # Level 1: Unplanned tasks completed
+                current = len([t for t in state.tasks['done'] if t['type'] == WorkType.UNPLANNED])
+
+            elif goal_id == 'tasks_done':
+                # General: Any tasks done
+                current = len(state.tasks['done'])
+
+            elif goal_id == 'stability_target':
+                # Stability percentage
+                current = state.stability
+
+            elif goal_id == 'cicd_coverage':
+                # CI/CD automation coverage
+                current = state.cicd_coverage if state.cicd_pipeline else 0
+
+            elif goal_id == 'bus_factor':
+                # Bus factor (people who know critical systems)
+                current = state.bus_factor
+
+            elif goal_id == 'knowledge_share':
+                # Knowledge sharing percentage
+                current = state.knowledge
+
+            elif goal_id == 'process_efficiency':
+                # Process efficiency
+                current = state.process_efficiency
+
+            elif goal_id == 'vsm_ratio':
+                # Value Stream Mapping (lower is better, so we invert logic)
+                # Target is a max value, so current counts as "progress" when lower
+                if state.vsm_ratio <= target:
+                    current = target
+                else:
+                    # Partial progress based on how close we are
+                    current = max(0, target - (state.vsm_ratio - target))
+
+            elif goal_id == 'learning_rate':
+                current = state.learning_rate
+
+            elif goal_id == 'experiment_velocity':
+                current = state.experiment_velocity
+
+            goal['current'] = current
+            if current >= target:
+                goal['completed'] = True
+            else:
+                all_complete = False
+
+        # Check if level should be marked complete
+        if all_complete and not state.level_complete:
+            self._trigger_level_complete()
+
+    def _trigger_level_complete(self):
+        """Пометить уровень как завершённый и показать модалку."""
+        state = self.active_game_state
+        old_level = state.level
+
+        state.level_complete = {
+            'level': old_level,
+            'message': f'Level {old_level} Complete!',
+            'stats': {
+                'week': state.week,
+                'stability': state.stability,
+                'tasks_done': len(state.tasks['done']),
+                'goals': [g['description'] for g in state.level_goals if g['completed']]
+            }
+        }
+
+        state.chat_history.append({"sender": "System", "text": f"🎉 LEVEL {old_level} COMPLETE! Все цели достигнуты!"})
+
+    def _advance_to_next_level(self):
+        """Продвинуться на следующий уровень. Вызывается после закрытия модалки."""
+        state = self.active_game_state
+        current = state.level
+
+        state.level_complete = None  # Clear the modal
+
+        if current == 1:
+            self._initialize_level_2()
+        elif current == 2:
+            self._initialize_level_3()
+        elif current == 3:
+            self._initialize_level_4()
+        elif current == 4:
+            self._initialize_level_5()
+        elif current == 5:
+            self._initialize_level_6()
+        elif current == 6:
+            self._handle_game_win()
+
+    # --- Level Initialization ---
 
     def _initialize_level_1(self):
         state = self.active_game_state
         state.level = 1
         state.unplanned_work = 80
         state.wip_limit = 99 # No limit in Chaos phase
+
+        # Clear previous level complete
+        state.level_complete = None
 
         state.tasks["backlog"] = []
         state.tasks["in_progress"] = []
@@ -1583,6 +1717,11 @@ class SimulationEngine:
         state.tasks["in_progress"] = chaos_tasks
         state.tasks["backlog"] = [phoenix_task]
 
+        # Set Level 1 Goals
+        self._set_level_goals([
+            {'id': 'unplanned_done', 'description': 'Complete all 3 critical incidents', 'target': 3, 'icon': '🔥'}
+        ])
+
         state.chat_history.append({"sender": "CFO", "text": "Где мои деньги?! Если зарплаты не уйдут к вечеру, у нас проблемы!"})
         state.chat_history.append({"sender": "Steve (Manager)", "text": "Билл, всё горит. Брент разрывается на части."})
         state.mentor_log.append({"sender": "Эрик", "text": "Посмотри на доску. Все красное. Это 'Незапланированная работа'. Она убивает твой проект."})
@@ -1594,6 +1733,9 @@ class SimulationEngine:
         state.wip_limit = 3 # Strict Limit for Level 2
         state.unplanned_work = 20 # Stabilized
 
+        # Clear previous level complete
+        state.level_complete = None
+
         # Set level_up notification for frontend
         state.level_up = {
             'from': old_level,
@@ -1601,13 +1743,12 @@ class SimulationEngine:
             'message': 'LEVEL UP! Ты потушил все пожары. Теперь учись видеть поток.',
             'stats': {
                 'title': 'The Visualizer',
-                'objective': 'Maintain 80%+ stability for 3 weeks while completing business value.'
+                'objective': 'Maintain 80%+ stability while completing 5 tasks.'
             }
         }
 
-        # Keep existing 'Done' tasks but archive them conceptually.
-        # For simplicity, let's keep Phoenix in Backlog if it wasn't started, or move it to In Progress.
-        # We will add a mix of tasks to simulate flow.
+        # Archive completed tasks - clear done column for new level
+        state.tasks["done"] = []
 
         new_tasks = [
             {"id": "task-feat-2", "title": "Cart: One-Click Buy", "type": WorkType.BUSINESS, "points": 5, "duration": 3, "required_resource": None, "assigned_resource": None, "description": "Feature request from Marketing."},
@@ -1616,6 +1757,12 @@ class SimulationEngine:
         ]
 
         state.tasks["backlog"].extend(new_tasks)
+
+        # Set Level 2 Goals
+        self._set_level_goals([
+            {'id': 'stability_target', 'description': 'Maintain 80%+ stability', 'target': 80, 'icon': '📊'},
+            {'id': 'tasks_done', 'description': 'Complete 5 tasks', 'target': 5, 'icon': '✅'}
+        ])
 
         state.chat_history.append({"sender": "System", "text": "--- УРОВЕНЬ 2: УВИДЕТЬ ПОТОК ---"})
         state.mentor_log.append({"sender": "Эрик", "text": "Поздравляю, ты потушил пожары. Теперь ты должен научиться видеть поток. Мы вводим WIP-лимиты. Не бери в работу больше 3 задач одновременно!"})
@@ -1869,6 +2016,10 @@ class SimulationEngine:
 
         # Clear pending event
         state.pending_event = None
+
+    def _handle_level_complete_advance(self, action):
+        """Обработать нажатие 'Continue' на Level Complete modal."""
+        self._advance_to_next_level()
 
     def _try_trigger_event(self):
         """Try to trigger a random event based on game state."""
