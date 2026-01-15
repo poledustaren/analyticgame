@@ -568,6 +568,149 @@ class Sprint:
             "retro_notes": self.retro_notes
         }
 
+class PipelineStage(Enum):
+    """Этапы CI/CD пайплайна."""
+    BUILD = "build"
+    TEST = "test"
+    DEPLOY_STAGING = "deploy_staging"
+    DEPLOY_PROD = "deploy_prod"
+    MONITOR = "monitor"
+
+class PipelineStageStatus(Enum):
+    """Статус этапа пайплайна."""
+    PENDING = "pending"
+    RUNNING = "running"
+    SUCCESS = "success"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+class CICDPipeline:
+    """Модель CI/CD пайплайна для визуализации деплоймента."""
+    def __init__(self, pipeline_id: str, name: str = "Deployment Pipeline"):
+        self.id = pipeline_id
+        self.name = name
+        self.created_at = datetime.now()
+        self.stages = {
+            PipelineStage.BUILD.value: {
+                "status": PipelineStageStatus.PENDING.value,
+                "duration": 0,
+                "last_run": None
+            },
+            PipelineStage.TEST.value: {
+                "status": PipelineStageStatus.PENDING.value,
+                "duration": 0,
+                "last_run": None
+            },
+            PipelineStage.DEPLOY_STAGING.value: {
+                "status": PipelineStageStatus.PENDING.value,
+                "duration": 0,
+                "last_run": None
+            },
+            PipelineStage.DEPLOY_PROD.value: {
+                "status": PipelineStageStatus.PENDING.value,
+                "duration": 0,
+                "last_run": None
+            },
+            PipelineStage.MONITOR.value: {
+                "status": PipelineStageStatus.PENDING.value,
+                "duration": 0,
+                "last_run": None
+            }
+        }
+        self.current_stage = None  # Currently executing stage
+        self.total_runs = 0
+        self.successful_runs = 0
+        self.failed_runs = 0
+        self.is_automated = False  # Becomes true after full implementation
+
+    def start_pipeline(self):
+        """Запускает пайплайн с начала."""
+        self.current_stage = PipelineStage.BUILD.value
+        self.stages[PipelineStage.BUILD.value]["status"] = PipelineStageStatus.RUNNING.value
+        self.stages[PipelineStage.BUILD.value]["last_run"] = datetime.now()
+        self.total_runs += 1
+        return self.to_dict()
+
+    def advance_stage(self):
+        """Продвигает пайплайн на следующий этап."""
+        stage_order = [
+            PipelineStage.BUILD.value,
+            PipelineStage.TEST.value,
+            PipelineStage.DEPLOY_STAGING.value,
+            PipelineStage.DEPLOY_PROD.value,
+            PipelineStage.MONITOR.value
+        ]
+
+        if not self.current_stage:
+            return self.start_pipeline()
+
+        current_idx = stage_order.index(self.current_stage)
+        if current_idx < len(stage_order) - 1:
+            # Mark current stage as success
+            self.stages[self.current_stage]["status"] = PipelineStageStatus.SUCCESS.value
+
+            # Move to next stage
+            next_stage = stage_order[current_idx + 1]
+            self.current_stage = next_stage
+            self.stages[next_stage]["status"] = PipelineStageStatus.RUNNING.value
+            self.stages[next_stage]["last_run"] = datetime.now()
+
+            return self.to_dict()
+
+        # Pipeline complete
+        self.current_stage = None
+        self.stages[PipelineStage.MONITOR.value]["status"] = PipelineStageStatus.SUCCESS.value
+        self.successful_runs += 1
+        return self.to_dict()
+
+    def fail_stage(self, stage: str):
+        """Отмечает этап как неудачный."""
+        if stage in self.stages:
+            self.stages[stage]["status"] = PipelineStageStatus.FAILED.value
+            self.current_stage = None
+            self.failed_runs += 1
+            # Reset all stages after failed one
+            stage_order = [
+                PipelineStage.BUILD.value,
+                PipelineStage.TEST.value,
+                PipelineStage.DEPLOY_STAGING.value,
+                PipelineStage.DEPLOY_PROD.value,
+                PipelineStage.MONITOR.value
+            ]
+            failed_idx = stage_order.index(stage)
+            for s in stage_order[failed_idx + 1:]:
+                self.stages[s]["status"] = PipelineStageStatus.PENDING.value
+        return self.to_dict()
+
+    def reset(self):
+        """Сбрасывает пайплайн для нового запуска."""
+        for stage in self.stages.values():
+            stage["status"] = PipelineStageStatus.PENDING.value
+        self.current_stage = None
+        return self.to_dict()
+
+    def get_coverage_percentage(self) -> int:
+        """Возвращает процент покрытия CI/CD."""
+        implemented_stages = sum(
+            1 for s in self.stages.values()
+            if s["last_run"] is not None
+        )
+        return int((implemented_stages / len(self.stages)) * 100)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "created_at": self.created_at.isoformat(),
+            "stages": self.stages,
+            "current_stage": self.current_stage,
+            "total_runs": self.total_runs,
+            "successful_runs": self.successful_runs,
+            "failed_runs": self.failed_runs,
+            "is_automated": self.is_automated,
+            "coverage": self.get_coverage_percentage()
+        }
+
 class GameState:
     """Хранит все данные о текущем состоянии игры."""
     def __init__(self):
@@ -590,6 +733,9 @@ class GameState:
         self.experiment_velocity = 5  # Number of experiments per sprint
         self.cicd_coverage = 0  # CI/CD automation percentage
         self.quality_score = 30  # Code quality metric
+
+        # CI/CD Pipeline (available from Level 3)
+        self.cicd_pipeline = None  # CICDPipeline instance or None
 
         # Logs
         self.chat_history = [{"sender": "System", "text": "Добро пожаловать в симулятор 'Проект Феникс'!"}]
@@ -650,6 +796,9 @@ class GameState:
              "choice_id": e["choice_id"], "consequences": e["consequences"]}
             for e in self.event_history
         ]
+        # Serialize CI/CD pipeline
+        if self.cicd_pipeline:
+            data['cicd_pipeline'] = self.cicd_pipeline.to_dict()
         return data
 
     @classmethod
@@ -678,6 +827,19 @@ class GameState:
                     sprint.end_time = datetime.fromisoformat(sprint_data['end_time'])
                 sprints.append(sprint)
             data['sprint_history'] = sprints
+        # Handle CI/CD pipeline deserialization
+        if 'cicd_pipeline' in data and data['cicd_pipeline']:
+            pipeline_data = data['cicd_pipeline']
+            pipeline = CICDPipeline(pipeline_data['id'], pipeline_data.get('name', 'Deployment Pipeline'))
+            pipeline.stages = pipeline_data.get('stages', pipeline.stages)
+            pipeline.current_stage = pipeline_data.get('current_stage')
+            pipeline.total_runs = pipeline_data.get('total_runs', 0)
+            pipeline.successful_runs = pipeline_data.get('successful_runs', 0)
+            pipeline.failed_runs = pipeline_data.get('failed_runs', 0)
+            pipeline.is_automated = pipeline_data.get('is_automated', False)
+            if pipeline_data.get('created_at'):
+                pipeline.created_at = datetime.fromisoformat(pipeline_data['created_at'])
+            data['cicd_pipeline'] = pipeline
         instance.__dict__.update(data)
         return instance
 
@@ -1350,6 +1512,12 @@ class SimulationEngine:
         # Quiz actions
         elif action_type == 'quiz_start': self._handle_quiz_start(action)
         elif action_type == 'quiz_submit_answer': self._handle_quiz_submit_answer(action)
+        # CI/CD Pipeline actions (Level 3+)
+        elif action_type == 'pipeline_create': self._handle_pipeline_create(action)
+        elif action_type == 'pipeline_start': self._handle_pipeline_start(action)
+        elif action_type == 'pipeline_advance': self._handle_pipeline_advance(action)
+        elif action_type == 'pipeline_reset': self._handle_pipeline_reset(action)
+        elif action_type == 'pipeline_automate': self._handle_pipeline_automate(action)
 
         self._check_level_transition()
         self._try_trigger_event()
@@ -1418,12 +1586,25 @@ class SimulationEngine:
 
     def _initialize_level_3(self):
         state = self.active_game_state
+        old_level = state.level
         state.level = 3
         state.wip_limit = 4  # Slightly increased
         state.unplanned_work = 15  # Further stabilized
 
-        # Add quality-focused tasks
+        # Set level_up notification
+        state.level_up = {
+            'from': old_level,
+            'to': 3,
+            'message': 'LEVEL UP! Петля обратной связи. Визуализируй свой пайплайн доставки.',
+            'stats': {
+                'title': 'The Feedback Loop',
+                'objective': 'Create CI/CD pipeline and achieve 100% coverage with 85%+ stability.'
+            }
+        }
+
+        # Add quality-focused tasks including CI/CD pipeline
         new_tasks = [
+            {"id": "task-cicd-init", "title": "Create CI/CD Pipeline", "type": WorkType.INTERNAL, "points": 8, "duration": 4, "required_resource": "brent", "assigned_resource": None, "description": "Создать базовый CI/CD пайплайн для визуализации процесса доставки кода."},
             {"id": "task-auto-1", "title": "Automated Tests Setup", "type": WorkType.INTERNAL, "points": 8, "duration": 4, "required_resource": "brent", "assigned_resource": None, "description": "Внедрить автоматизированное тестирование."},
             {"id": "task-qa-1", "title": "Integrate QA into Team", "type": WorkType.INTERNAL, "points": 5, "duration": 3, "required_resource": None, "assigned_resource": None, "description": "Интегрировать QA в команду разработки."},
             {"id": "task-cab-1", "title": "Establish CAB Process", "type": WorkType.CHANGES, "points": 3, "duration": 2, "required_resource": None, "assigned_resource": None, "description": "Создать процесс CAB для управления изменениями."}
@@ -1432,7 +1613,7 @@ class SimulationEngine:
         state.tasks["backlog"].extend(new_tasks)
 
         state.chat_history.append({"sender": "System", "text": "--- УРОВЕНЬ 3: ПЕТЛЯ ОБРАТНОЙ СВЯЗИ ---"})
-        state.mentor_log.append({"sender": "Эрик", "text": "Отлично! Теперь нужно сократить количество багов, доходящих до продакшена. Внедрите качество на источнике и формальный процесс управления изменениями (CAB)."})
+        state.mentor_log.append({"sender": "Эрик", "text": "Отлично! Теперь нужно сократить количество багов, доходящих до продакшена. Внедрите качество на источнике, создайте CI/CD пайплайн и формальный процесс управления изменениями (CAB)."})
 
     def _initialize_level_4(self):
         state = self.active_game_state
@@ -1441,7 +1622,7 @@ class SimulationEngine:
 
         # Add automation tasks
         new_tasks = [
-            {"id": "task-cicd-1", "title": "Create CI/CD Pipeline", "type": WorkType.INTERNAL, "points": 13, "duration": 6, "required_resource": "brent", "assigned_resource": None, "description": "Создать CI/CD пайплайн для автоматизации деплоев."},
+            {"id": "task-cicd-auto", "title": "Automate CI/CD Pipeline", "type": WorkType.INTERNAL, "points": 13, "duration": 6, "required_resource": "brent", "assigned_resource": None, "description": "Полностью автоматизировать CI/CD пайплайн для безучастного деплоя."},
             {"id": "task-iac-1", "title": "Infrastructure as Code", "type": WorkType.INTERNAL, "points": 8, "duration": 4, "required_resource": "brent", "assigned_resource": None, "description": "Внедрить инфраструктуру как код."},
             {"id": "task-doc-1", "title": "Document Brent's Knowledge", "type": WorkType.INTERNAL, "points": 5, "duration": 3, "required_resource": None, "assigned_resource": None, "description": "Документировать знания Брента для снижения bus factor."}
         ]
@@ -2108,5 +2289,109 @@ class SimulationEngine:
             else:
                 state.chat_history.append({"sender": "System", "text": f"❌ Неправильно. {result['explanation']}"})
                 state.mentor_log.append({"sender": "Эрик", "text": "Не страшно ошибаться — главное, учиться на ошибках."})
+
+    # --- CI/CD Pipeline Action Handlers (Level 3+) ---
+
+    def _handle_pipeline_create(self, action):
+        """Создает новый CI/CD пайплайн."""
+        state = self.active_game_state
+
+        # Only available in Level 3+
+        if state.level < 3:
+            state.chat_history.append({"sender": "System", "text": "CI/CD пайплайн доступен только на Уровне 3 и выше."})
+            return
+
+        # Check if pipeline already exists
+        if state.cicd_pipeline:
+            state.chat_history.append({"sender": "System", "text": "Пайплайн уже создан!"})
+            return
+
+        # Create the pipeline
+        pipeline_id = f"pipeline-{state.week}-{len(state.sprint_history)}"
+        state.cicd_pipeline = CICDPipeline(pipeline_id, "Deployment Pipeline")
+
+        state.chat_history.append({"sender": "System", "text": "🚀 CI/CD Pipeline создан! Теперь вы можете визуализировать и управлять процессом деплоя."})
+        state.mentor_log.append({"sender": "Эрик", "text": "Отлично! Пайплайн создан. Теперь вы видите весь путь кода от коммита до продакшена. Это Second Way — быстрая обратная связь."})
+
+    def _handle_pipeline_start(self, action):
+        """Запускает пайплайн с начала."""
+        state = self.active_game_state
+
+        if not state.cicd_pipeline:
+            state.chat_history.append({"sender": "System", "text": "Сначала создайте пайплайн!"})
+            return
+
+        state.cicd_pipeline.start_pipeline()
+        state.chat_history.append({"sender": "System", "text": "🔧 Пайплайн запущен: BUILD → TEST → STAGING → PROD → MONITOR"})
+
+    def _handle_pipeline_advance(self, action):
+        """Продвигает пайплайн на следующий этап."""
+        state = self.active_game_state
+
+        if not state.cicd_pipeline:
+            return
+
+        pipeline = state.cicd_pipeline
+        result = pipeline.advance_stage()
+
+        # Update cicd_coverage metric from pipeline
+        state.cicd_coverage = pipeline.get_coverage_percentage()
+
+        if pipeline.current_stage:
+            stage_names = {
+                "build": "BUILD",
+                "test": "TEST",
+                "deploy_staging": "STAGING",
+                "deploy_prod": "PRODUCTION",
+                "monitor": "MONITOR"
+            }
+            state.chat_history.append({"sender": "System", "text": f"✓ {stage_names.get(pipeline.current_stage, pipeline.current_stage)} этап запущен..."})
+
+            # Erik's feedback based on stage
+            if pipeline.current_stage == "test":
+                state.mentor_log.append({"sender": "Эрик", "text": "Автотесты — это ключ к быстрой обратной связи. Чем быстрее найдете баг, тем дешевле его исправить."})
+            elif pipeline.current_stage == "deploy_prod":
+                state.mentor_log.append({"sender": "Эрик", "text": "Деплой в прод должен быть рутиной. Если вы волнуетесь при деплое — у вас проблемы с процессом."})
+        else:
+            # Pipeline complete
+            state.chat_history.append({"sender": "System", "text": f"🎉 Пайплайн успешно завершен! Coverage: {state.cicd_coverage}%"})
+            state.mentor_log.append({"sender": "Эрик", "text": "Превосходно! Код прошел весь путь до продакшена. Это и есть DevOps — быстрая и безопасная доставка ценности."})
+
+    def _handle_pipeline_reset(self, action):
+        """Сбрасывает пайплайн для нового запуска."""
+        state = self.active_game_state
+
+        if not state.cicd_pipeline:
+            return
+
+        state.cicd_pipeline.reset()
+        state.chat_history.append({"sender": "System", "text": "Пайплайн сброшен. Готов к новому запуску."})
+
+    def _handle_pipeline_automate(self, action):
+        """Включает автоматизацию пайплайна (дорогое улучшение)."""
+        state = self.active_game_state
+
+        if not state.cicd_pipeline:
+            state.chat_history.append({"sender": "System", "text": "Сначала создайте пайплайн!"})
+            return
+
+        if state.cicd_pipeline.is_automated:
+            state.chat_history.append({"sender": "System", "text": "Пайплайн уже автоматизирован!"})
+            return
+
+        # Check budget
+        automation_cost = 15000
+        if state.budget < automation_cost:
+            state.chat_history.append({"sender": "System", "text": f"Недостаточно бюджета! Нужно ${automation_cost}, есть ${state.budget}"})
+            state.mentor_log.append({"sender": "Эрик", "text": "Автоматизация требует инвестиций, но окупается в долгосрочной перспективе."})
+            return
+
+        # Enable automation
+        state.budget -= automation_cost
+        state.cicd_pipeline.is_automated = True
+        state.cicd_coverage = 100  # Full coverage when automated
+
+        state.chat_history.append({"sender": "System", "text": f"✨ Пайплайн автоматизирован! -${automation_cost} из бюджета"})
+        state.mentor_log.append({"sender": "Эрик", "text": "Автоматизация — это Third Way. Теперь деплой происходит без участия человека, быстро и надежно."})
 
 engine = SimulationEngine()
