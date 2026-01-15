@@ -66,7 +66,7 @@
 
             <div class="sidebar-menu">
                 <button id="new-game-btn" class="menu-btn">Restart Level</button>
-                <button id="save-game-btn" class="menu-btn">Save Progress</button>
+                <button id="save-game-btn" class="menu-btn">Save / Load</button>
             </div>
         </aside>
 
@@ -410,6 +410,50 @@
             <div class="modal-footer">
                 <button class="modal-btn secondary" id="poker-cancel">Cancel</button>
                 <button class="modal-btn primary" id="poker-confirm">Apply Estimate</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SAVE/LOAD MODAL -->
+    <div id="saveload-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content saveload-modal">
+            <div class="modal-header">
+                <h2>💾 Save / Load Game</h2>
+                <button class="modal-close" id="saveload-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="saveload-tabs">
+                    <button class="saveload-tab-btn active" data-tab="save">Save Game</button>
+                    <button class="saveload-tab-btn" data-tab="load">Load Game</button>
+                </div>
+
+                <!-- Save Tab -->
+                <div id="save-tab" class="saveload-tab-content active">
+                    <div class="saveload-section">
+                        <label>Select Save Slot</label>
+                        <div class="save-slots-grid" id="save-slots-container">
+                            <!-- Save slots will be populated here -->
+                        </div>
+                    </div>
+                    <div class="saveload-section">
+                        <label>Save Name (optional)</label>
+                        <input type="text" id="save-name-input" placeholder="e.g., Week 5 - Before deployment" maxlength="50">
+                    </div>
+                </div>
+
+                <!-- Load Tab -->
+                <div id="load-tab" class="saveload-tab-content">
+                    <div class="saveload-section">
+                        <label>Select Saved Game</label>
+                        <div class="save-slots-grid" id="load-slots-container">
+                            <!-- Save slots will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn secondary" id="saveload-cancel">Cancel</button>
+                <button class="modal-btn primary" id="saveload-confirm">Save</button>
             </div>
         </div>
     </div>

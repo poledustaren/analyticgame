@@ -603,6 +603,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Initialization ---
     function init() {
+        // Initialize Save/Load Modal
+        initSaveLoadModal();
+
         // Attach Event Listeners
         newGameBtn.onclick = startNewGame;
         saveGameBtn.onclick = handleSaveGame;
@@ -688,7 +691,240 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function handleSaveGame() {
-        alert("Save functionality placeholder.");
+        openSaveLoadModal('save');
+    }
+
+    // --- Save/Load Modal Functions ---
+    let saveloadModal = null;
+    let saveloadCloseBtn = null;
+    let saveloadCancelBtn = null;
+    let saveloadConfirmBtn = null;
+    let saveloadTabBtns = null;
+    let saveloadTabContents = null;
+    let selectedSaveSlot = null;
+    let currentSaveloadMode = 'save'; // 'save' or 'load'
+    let availableSaves = [];
+
+    function initSaveLoadModal() {
+        saveloadModal = document.getElementById('saveload-modal');
+        saveloadCloseBtn = document.getElementById('saveload-close');
+        saveloadCancelBtn = document.getElementById('saveload-cancel');
+        saveloadConfirmBtn = document.getElementById('saveload-confirm');
+        saveloadTabBtns = document.querySelectorAll('.saveload-tab-btn');
+        saveloadTabContents = document.querySelectorAll('.saveload-tab-content');
+
+        // Event listeners
+        saveloadCloseBtn.onclick = closeSaveLoadModal;
+        saveloadCancelBtn.onclick = closeSaveLoadModal;
+        saveloadConfirmBtn.onclick = handleSaveloadConfirm;
+
+        // Tab switching
+        saveloadTabBtns.forEach(btn => {
+            btn.onclick = () => switchSaveloadTab(btn.dataset.tab);
+        });
+    }
+
+    async function openSaveLoadModal(mode = 'save') {
+        currentSaveloadMode = mode;
+        selectedSaveSlot = null;
+
+        // Update UI based on mode
+        saveloadTabBtns.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === mode);
+        });
+        saveloadTabContents.forEach(content => {
+            content.classList.toggle('active', content.id === `${mode}-tab`);
+        });
+
+        // Update confirm button text
+        saveloadConfirmBtn.textContent = mode === 'save' ? 'Save' : 'Load';
+
+        // Load and display save slots
+        await loadSaveSlots();
+
+        // Clear save name input for save mode
+        if (mode === 'save') {
+            document.getElementById('save-name-input').value = '';
+        }
+
+        saveloadModal.style.display = 'flex';
+    }
+
+    function closeSaveLoadModal() {
+        saveloadModal.style.display = 'none';
+        selectedSaveSlot = null;
+        // Clear selections
+        document.querySelectorAll('.save-slot').forEach(slot => {
+            slot.classList.remove('selected');
+        });
+    }
+
+    function switchSaveloadTab(tab) {
+        currentSaveloadMode = tab;
+        saveloadTabBtns.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === tab);
+        });
+        saveloadTabContents.forEach(content => {
+            content.classList.toggle('active', content.id === `${tab}-tab`);
+        });
+
+        // Update confirm button
+        saveloadConfirmBtn.textContent = tab === 'save' ? 'Save' : 'Load';
+
+        // Clear selection
+        selectedSaveSlot = null;
+        document.querySelectorAll('.save-slot').forEach(slot => {
+            slot.classList.remove('selected');
+        });
+    }
+
+    async function loadSaveSlots() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/saves`);
+            const data = await response.json();
+            availableSaves = data.saves || [];
+
+            // Render save slots for both save and load tabs
+            renderSaveSlots('save-slots-container', true);
+            renderSaveSlots('load-slots-container', false);
+        } catch (error) {
+            console.error('Failed to load save slots:', error);
+            Toast.error('Error', 'Failed to load save slots', 3000);
+        }
+    }
+
+    function renderSaveSlots(containerId, allowEmpty) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+
+        // Create 5 save slots
+        for (let i = 1; i <= 5; i++) {
+            const slotId = `slot${i}`;
+            const saveData = availableSaves.find(s => s.slot_id === slotId);
+
+            const slotEl = document.createElement('div');
+            slotEl.className = 'save-slot';
+            slotEl.dataset.slotId = slotId;
+
+            if (saveData) {
+                slotEl.innerHTML = `
+                    <div class="save-slot-id">Slot ${i}</div>
+                    <div class="save-slot-name">${escapeHtml(saveData.name || 'Untitled')}</div>
+                    <div class="save-slot-info">
+                        <div><span>Week:</span> <span>${saveData.week || 1}</span></div>
+                        <div><span>Level:</span> <span>${saveData.level || 1}</span></div>
+                        <div><span>Date:</span> <span>${formatDate(saveData.saved_at)}</span></div>
+                    </div>
+                `;
+            } else {
+                slotEl.classList.add('empty');
+                slotEl.innerHTML = `
+                    <div class="save-slot-id">Slot ${i}</div>
+                    <div class="save-slot-name">Empty Slot</div>
+                `;
+            }
+
+            // Click handler
+            slotEl.onclick = () => selectSaveSlot(slotId, containerId);
+
+            container.appendChild(slotEl);
+        }
+    }
+
+    function selectSaveSlot(slotId, containerId) {
+        selectedSaveSlot = slotId;
+
+        // Clear all selections in both containers
+        document.querySelectorAll('.save-slot').forEach(slot => {
+            slot.classList.remove('selected');
+        });
+
+        // Select clicked slot
+        const slotEl = document.querySelector(`.save-slot[data-slot-id="${slotId}"]`);
+        if (slotEl) {
+            slotEl.classList.add('selected');
+        }
+    }
+
+    async function handleSaveloadConfirm() {
+        if (!selectedSaveSlot) {
+            Toast.error('No Slot Selected', 'Please select a save slot', 2000);
+            return;
+        }
+
+        if (currentSaveloadMode === 'save') {
+            await saveGame(selectedSaveSlot);
+        } else {
+            await loadGame(selectedSaveSlot);
+        }
+    }
+
+    async function saveGame(slotId) {
+        const saveName = document.getElementById('save-name-input').value.trim();
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/save_game`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    slot_id: slotId,
+                    name: saveName || null
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                Toast.success('Game Saved!', `Saved to ${slotId}`, 2000);
+                closeSaveLoadModal();
+            } else {
+                Toast.error('Save Failed', data.error || 'Could not save game', 3000);
+            }
+        } catch (error) {
+            console.error('Save error:', error);
+            Toast.error('Save Failed', 'Could not communicate with server', 3000);
+        }
+    }
+
+    async function loadGame(slotId) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/load_game`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ slot_id: slotId })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                currentState = data.state;
+                render(currentState);
+                Toast.success('Game Loaded!', `Loaded from ${slotId}`, 2000);
+                closeSaveLoadModal();
+            } else {
+                Toast.error('Load Failed', data.error || 'Could not load game', 3000);
+            }
+        } catch (error) {
+            console.error('Load error:', error);
+            Toast.error('Load Failed', 'Could not communicate with server', 3000);
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function formatDate(isoString) {
+        if (!isoString) return 'Unknown';
+        const date = new Date(isoString);
+        return date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
     }
 
     // --- Rendering Logic ---
