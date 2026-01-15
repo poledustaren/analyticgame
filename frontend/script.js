@@ -444,6 +444,143 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- CI/CD Pipeline Handlers (Level 3+) ---
+    async function handlePipelineCreate() {
+        SoundSystem.play('modalOpen');
+        const newState = await sendAction({ type: 'pipeline_create' });
+        if (newState) {
+            Toast.success('Pipeline Created', 'CI/CD pipeline is ready to configure!', 3000);
+        }
+    }
+
+    async function handlePipelineStart() {
+        SoundSystem.play('sprintStart');
+        const newState = await sendAction({ type: 'pipeline_start' });
+        if (newState) {
+            Toast.info('Pipeline Started', 'Build process initiated...', 2000);
+        }
+    }
+
+    async function handlePipelineAdvance() {
+        SoundSystem.play('taskComplete');
+        const newState = await sendAction({ type: 'pipeline_advance' });
+        if (newState && newState.cicd_pipeline && !newState.cicd_pipeline.current_stage) {
+            Toast.success('Pipeline Complete!', 'All stages passed successfully!', 4000);
+            SoundSystem.play('levelUp');
+        }
+    }
+
+    async function handlePipelineReset() {
+        const newState = await sendAction({ type: 'pipeline_reset' });
+        if (newState) {
+            Toast.info('Pipeline Reset', 'Ready for a new run...', 2000);
+        }
+    }
+
+    async function handlePipelineAutomate() {
+        const newState = await sendAction({ type: 'pipeline_automate' });
+        if (newState && newState.cicd_pipeline && newState.cicd_pipeline.is_automated) {
+            Toast.success('Automation Enabled!', 'Pipeline is now fully automated!', 4000);
+            SoundSystem.play('levelUp');
+        } else if (newState && newState.error) {
+            Toast.error('Insufficient Budget', newState.error, 4000);
+        }
+    }
+
+    function renderPipeline(state) {
+        const cicdSection = document.getElementById('cicd-section');
+        const pipelineCreateBtn = document.getElementById('pipeline-create-btn');
+        const pipelineStartBtn = document.getElementById('pipeline-start-btn');
+        const pipelineAdvanceBtn = document.getElementById('pipeline-advance-btn');
+        const pipelineResetBtn = document.getElementById('pipeline-reset-btn');
+        const pipelineAutomateBtn = document.getElementById('pipeline-automate-btn');
+        const pipelineContainer = document.getElementById('pipeline-container');
+        const pipelineStages = document.getElementById('pipeline-stages');
+        const pipelineStats = document.getElementById('pipeline-stats');
+
+        // Show CI/CD section only from Level 3
+        if (state.level >= 3) {
+            cicdSection.style.display = 'block';
+        } else {
+            cicdSection.style.display = 'none';
+            return;
+        }
+
+        const pipeline = state.cicd_pipeline;
+
+        if (!pipeline) {
+            // No pipeline created yet
+            pipelineCreateBtn.style.display = 'inline-block';
+            pipelineStartBtn.style.display = 'none';
+            pipelineAdvanceBtn.style.display = 'none';
+            pipelineResetBtn.style.display = 'none';
+            pipelineAutomateBtn.style.display = 'none';
+            pipelineContainer.style.display = 'block';
+            pipelineContainer.innerHTML = '<div class="pipeline-empty">Create a pipeline to visualize your deployment process (Level 3+)</div>';
+            pipelineStages.style.display = 'none';
+            pipelineStats.style.display = 'none';
+        } else {
+            // Pipeline exists
+            pipelineCreateBtn.style.display = 'none';
+            pipelineStartBtn.style.display = 'inline-block';
+            pipelineAdvanceBtn.style.display = 'inline-block';
+            pipelineResetBtn.style.display = 'inline-block';
+            pipelineAutomateBtn.style.display = pipeline.is_automated ? 'none' : 'inline-block';
+            pipelineContainer.style.display = 'none';
+            pipelineStages.style.display = 'flex';
+            pipelineStats.style.display = 'flex';
+
+            // Update coverage bar
+            const coverage = pipeline.coverage || state.cicd_coverage || 0;
+            document.getElementById('cicd-coverage-bar').style.width = `${coverage}%`;
+            document.getElementById('cicd-coverage-text').textContent = `${coverage}%`;
+
+            // Update stats
+            document.getElementById('pipeline-runs').textContent = pipeline.total_runs || 0;
+            document.getElementById('pipeline-success').textContent = pipeline.successful_runs || 0;
+            document.getElementById('pipeline-failed').textContent = pipeline.failed_runs || 0;
+
+            // Render stages
+            const stages = ['build', 'test', 'deploy_staging', 'deploy_prod', 'monitor'];
+            const stageElements = pipelineStages.querySelectorAll('.pipeline-stage');
+            const arrows = pipelineStages.querySelectorAll('.pipeline-arrow');
+
+            let foundCurrent = false;
+            stageElements.forEach((stageEl, index) => {
+                const stageName = stageEl.dataset.stage;
+                const stageData = pipeline.stages[stageName];
+
+                stageEl.classList.remove('active', 'success', 'failed', 'pending');
+
+                if (stageData) {
+                    if (stageData.status === 'running') {
+                        stageEl.classList.add('active');
+                        foundCurrent = true;
+                    } else if (stageData.status === 'success') {
+                        stageEl.classList.add('success');
+                    } else if (stageData.status === 'failed') {
+                        stageEl.classList.add('failed');
+                    } else {
+                        stageEl.classList.add('pending');
+                    }
+                }
+            });
+
+            // Update arrows
+            arrows.forEach((arrow, index) => {
+                arrow.classList.remove('active', 'success');
+                if (index < stageElements.length - 1) {
+                    const currentStage = stageElements[index];
+                    if (currentStage.classList.contains('success')) {
+                        arrow.classList.add('success');
+                    } else if (currentStage.classList.contains('active')) {
+                        arrow.classList.add('active');
+                    }
+                }
+            });
+        }
+    }
+
     // --- Initialization ---
     function init() {
         // Attach Event Listeners
@@ -459,6 +596,19 @@ document.addEventListener('DOMContentLoaded', () => {
         planningConfirm.onclick = createSprint;
         reviewToRetroBtn.onclick = goToRetro;
         retroCompleteBtn.onclick = completeRetro;
+
+        // CI/CD Pipeline Event Listeners (Level 3+)
+        const pipelineCreateBtn = document.getElementById('pipeline-create-btn');
+        const pipelineStartBtn = document.getElementById('pipeline-start-btn');
+        const pipelineAdvanceBtn = document.getElementById('pipeline-advance-btn');
+        const pipelineResetBtn = document.getElementById('pipeline-reset-btn');
+        const pipelineAutomateBtn = document.getElementById('pipeline-automate-btn');
+
+        if (pipelineCreateBtn) pipelineCreateBtn.onclick = handlePipelineCreate;
+        if (pipelineStartBtn) pipelineStartBtn.onclick = handlePipelineStart;
+        if (pipelineAdvanceBtn) pipelineAdvanceBtn.onclick = handlePipelineAdvance;
+        if (pipelineResetBtn) pipelineResetBtn.onclick = handlePipelineReset;
+        if (pipelineAutomateBtn) pipelineAutomateBtn.onclick = handlePipelineAutomate;
 
         tabBtns.forEach(btn => {
             btn.addEventListener('click', () => {
@@ -584,7 +734,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // 6. Velocity Chart
         renderVelocity(state.velocity_history || []);
 
-        // 7. Achievements
+        // 7. CI/CD Pipeline (Level 3+)
+        renderPipeline(state);
+
+        // 8. Achievements
         renderAchievements(state);
     }
 

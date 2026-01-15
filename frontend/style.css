@@ -1478,3 +1478,314 @@ body {
     color: var(--text-primary);
     transform: scale(1.1);
 }
+
+/* ============================================
+   CI/CD PIPELINE VISUALIZATION STYLES
+   ============================================ */
+
+.cicd-section {
+    margin-top: 20px;
+    padding: 20px;
+    background: var(--bg-panel);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.cicd-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.cicd-header h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.cicd-controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.pipeline-btn {
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    transition: all 0.2s ease-out;
+}
+
+.pipeline-btn:hover {
+    background: var(--bg-dark);
+    border-color: var(--text-secondary);
+}
+
+.pipeline-btn.create-pipeline {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+
+.pipeline-btn.create-pipeline:hover {
+    background: #2563eb;
+}
+
+.pipeline-btn.start-pipeline {
+    background: var(--accent-success);
+    border-color: var(--accent-success);
+}
+
+.pipeline-btn.start-pipeline:hover {
+    background: #16a34a;
+}
+
+.pipeline-btn.advance-pipeline {
+    background: var(--accent-warning);
+    border-color: var(--accent-warning);
+}
+
+.pipeline-btn.advance-pipeline:hover {
+    background: #d97706;
+}
+
+.pipeline-btn.reset-pipeline {
+    background: var(--bg-card);
+    border-color: var(--border-color);
+}
+
+.pipeline-btn.automate-pipeline {
+    background: var(--card-automation);
+    border-color: var(--card-automation);
+}
+
+.pipeline-btn.automate-pipeline:hover {
+    background: #9333ea;
+}
+
+/* Coverage Bar */
+.cicd-coverage {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding: 12px;
+    background: var(--bg-dark);
+    border-radius: 8px;
+}
+
+.coverage-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.coverage-bar-bg {
+    flex-grow: 1;
+    height: 8px;
+    background: var(--bg-card);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.coverage-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-danger), var(--accent-warning), var(--accent-success));
+    transition: width 0.5s ease-out;
+    border-radius: 4px;
+}
+
+.coverage-text {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--accent-success);
+    min-width: 40px;
+    text-align: right;
+}
+
+/* Pipeline Container */
+.pipeline-container {
+    margin-bottom: 20px;
+}
+
+.pipeline-empty {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+/* Pipeline Stages */
+.pipeline-stages {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 20px;
+    background: var(--bg-dark);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.pipeline-stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    min-width: 80px;
+    padding: 16px;
+    background: var(--bg-card);
+    border-radius: 8px;
+    border: 2px solid var(--border-color);
+    transition: all 0.3s ease-out;
+    position: relative;
+}
+
+.pipeline-stage.active {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+}
+
+.pipeline-stage.success {
+    border-color: var(--accent-success);
+}
+
+.pipeline-stage.failed {
+    border-color: var(--accent-danger);
+}
+
+.pipeline-stage.pending {
+    opacity: 0.5;
+}
+
+.stage-icon {
+    font-size: 24px;
+    transition: transform 0.3s ease-out;
+}
+
+.pipeline-stage.active .stage-icon {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.pipeline-stage.success .stage-icon {
+    transform: scale(1.1);
+}
+
+.stage-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.stage-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border-color);
+    transition: background 0.3s ease-out;
+}
+
+.pipeline-stage.active .stage-indicator {
+    background: var(--accent-primary);
+    animation: blink 1s ease-in-out infinite;
+}
+
+.pipeline-stage.success .stage-indicator {
+    background: var(--accent-success);
+}
+
+.pipeline-stage.failed .stage-indicator {
+    background: var(--accent-danger);
+}
+
+.pipeline-arrow {
+    font-size: 20px;
+    color: var(--border-color);
+    transition: color 0.3s ease-out;
+}
+
+.pipeline-arrow.active {
+    color: var(--accent-primary);
+}
+
+.pipeline-arrow.success {
+    color: var(--accent-success);
+}
+
+/* Pipeline Stats */
+.pipeline-stats {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    padding: 16px;
+    background: var(--bg-dark);
+    border-radius: 8px;
+}
+
+.pipeline-stats .stat-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pipeline-stats .stat-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.pipeline-stats .stat-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.pipeline-stats .stat-value.success {
+    color: var(--accent-success);
+}
+
+.pipeline-stats .stat-value.failed {
+    color: var(--accent-danger);
+}
+
+/* Animations */
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.15);
+    }
+}
+
+@keyframes blink {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.3;
+    }
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    .pipeline-stages {
+        flex-direction: column;
+    }
+
+    .pipeline-arrow {
+        transform: rotate(90deg);
+    }
+}
