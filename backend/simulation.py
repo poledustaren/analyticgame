@@ -1274,10 +1274,24 @@ class SimulationEngine:
             # Mock LLM не использует контекст
             return self.llm.get_response(role)
 
-    def save_game(self, slot_id):
-        if not self.active_game_state: return {"error": "Нет активной игры для сохранения."}
+    def save_game(self, slot_id, name=None):
+        """Saves the current game state to a slot."""
+        if not self.active_game_state:
+            return {"error": "Нет активной игры для сохранения."}
+
+        # Ensure saves directory exists
+        os.makedirs(SAVES_DIR, exist_ok=True)
+
         save_path = os.path.join(SAVES_DIR, f"save_{slot_id}.json")
-        with open(save_path, 'w', encoding='utf-8') as f: json.dump(self.active_game_state.to_dict(), f, ensure_ascii=False, indent=4)
+
+        # Get current state and add save metadata
+        state_dict = self.active_game_state.to_dict()
+        state_dict["save_name"] = name
+        state_dict["saved_at"] = datetime.now().isoformat()
+
+        with open(save_path, 'w', encoding='utf-8') as f:
+            json.dump(state_dict, f, ensure_ascii=False, indent=4)
+
         return {"success": True, "message": f"Игра сохранена в слот {slot_id}."}
 
     def load_game(self, slot_id):
@@ -1287,8 +1301,32 @@ class SimulationEngine:
         return self.active_game_state.to_dict()
 
     def list_saves(self):
+        """Returns a list of save files with metadata."""
         saves = glob.glob(os.path.join(SAVES_DIR, 'save_*.json'))
-        return sorted([os.path.basename(s).replace('save_', '').replace('.json', '') for s in saves])
+        save_list = []
+
+        for save_path in saves:
+            try:
+                with open(save_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+
+                slot_id = os.path.basename(save_path).replace('save_', '').replace('.json', '')
+
+                # Get file modification time as fallback for saved_at
+                file_mtime = os.path.getmtime(save_path)
+
+                save_list.append({
+                    "slot_id": slot_id,
+                    "name": data.get("save_name") or f"Save {slot_id}",
+                    "week": data.get("week", 1),
+                    "level": data.get("level", 1),
+                    "saved_at": data.get("saved_at") or datetime.fromtimestamp(file_mtime).isoformat()
+                })
+            except (json.JSONDecodeError, KeyError, IOError) as e:
+                # Skip corrupted save files
+                continue
+
+        return {"saves": sorted(save_list, key=lambda x: x["slot_id"])}
 
     def dismiss_notification(self, notification_type):
         """Отклоняет уведомление и очищает его состояние."""
