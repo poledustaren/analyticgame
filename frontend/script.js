@@ -1113,5 +1113,304 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // ============================================
+    // QUIZ SYSTEM
+    // ============================================
+
+    const Quiz = {
+        modal: document.getElementById('quiz-modal'),
+        closeBtn: document.getElementById('quiz-close'),
+        toggleBtn: document.getElementById('quiz-toggle-btn'),
+        startBtn: document.getElementById('quiz-start-btn'),
+        cancelBtn: document.getElementById('quiz-cancel'),
+        nextBtn: document.getElementById('quiz-next-question'),
+
+        // Screens
+        startScreen: document.getElementById('quiz-start-screen'),
+        questionScreen: document.getElementById('quiz-question-screen'),
+        resultScreen: document.getElementById('quiz-result-screen'),
+        explanation: document.getElementById('quiz-explanation'),
+
+        // Elements
+        questionText: document.getElementById('quiz-question-text'),
+        optionsContainer: document.getElementById('quiz-options-container'),
+        currentNum: document.getElementById('quiz-current-num'),
+        totalNum: document.getElementById('quiz-total-num'),
+        scoreDisplay: document.getElementById('quiz-score'),
+        totalDisplay: document.getElementById('quiz-total'),
+        modalFooter: document.getElementById('quiz-modal-footer'),
+
+        // Result elements
+        resultIcon: document.getElementById('quiz-result-icon'),
+        resultTitle: document.getElementById('quiz-result-title'),
+        resultText: document.getElementById('quiz-result-text'),
+        explanationIcon: document.getElementById('explanation-icon'),
+        explanationTitle: document.getElementById('explanation-title'),
+        explanationText: document.getElementById('explanation-text'),
+
+        // State
+        currentQuestion: null,
+        selectedOption: null,
+        totalQuestions: 8,
+
+        init() {
+            // Toggle button
+            this.toggleBtn.addEventListener('click', () => this.openModal());
+
+            // Close button
+            this.closeBtn.addEventListener('click', () => this.closeModal());
+
+            // Cancel button
+            this.cancelBtn.addEventListener('click', () => this.closeModal());
+
+            // Start button
+            this.startBtn.addEventListener('click', () => this.startQuiz());
+
+            // Next question button
+            this.nextBtn.addEventListener('click', () => this.nextQuestion());
+
+            // Close on overlay click
+            this.modal.addEventListener('click', (e) => {
+                if (e.target === this.modal) {
+                    // Only allow closing if not in active question
+                    if (this.startScreen.style.display !== 'none') {
+                        this.closeModal();
+                    }
+                }
+            });
+        },
+
+        openModal() {
+            this.resetScreens();
+            this.modal.style.display = 'flex';
+            this.modalFooter.style.display = 'flex';
+            SoundSystem.play('modalOpen');
+        },
+
+        closeModal() {
+            this.modal.style.display = 'none';
+            SoundSystem.play('modalClose');
+        },
+
+        resetScreens() {
+            this.startScreen.style.display = 'block';
+            this.questionScreen.style.display = 'none';
+            this.resultScreen.style.display = 'none';
+            this.explanation.style.display = 'none';
+            this.startBtn.style.display = 'inline-block';
+            this.cancelBtn.style.display = 'inline-block';
+        },
+
+        async startQuiz() {
+            this.startBtn.style.display = 'none';
+            await this.startQuestion();
+        },
+
+        async startQuestion() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/action`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type: 'quiz_start' })
+                });
+                const result = await response.json();
+
+                if (result.quiz?.current_question) {
+                    this.showQuestion(result.quiz);
+                } else if (result.quiz?.remaining === 0) {
+                    this.showResults(result.quiz);
+                } else {
+                    // No more questions or quiz not available
+                    this.showResults(result.quiz || { score: 0, total_answered: 0 });
+                }
+            } catch (error) {
+                console.error('Failed to start quiz question:', error);
+                SoundSystem.play('error');
+                Toast.error('Quiz Error', 'Could not load question', 3000);
+            }
+        },
+
+        showQuestion(quizData) {
+            const question = quizData.current_question;
+            this.currentQuestion = question;
+            this.selectedOption = null;
+
+            // Update progress
+            this.currentNum.textContent = quizData.total_answered + 1;
+            this.totalNum.textContent = this.totalQuestions;
+            this.scoreDisplay.textContent = quizData.score;
+            this.totalDisplay.textContent = quizData.total_answered;
+
+            // Show question screen
+            this.startScreen.style.display = 'none';
+            this.resultScreen.style.display = 'none';
+            this.explanation.style.display = 'none';
+            this.questionScreen.style.display = 'block';
+
+            // Set question text
+            this.questionText.textContent = question.question;
+
+            // Render options
+            this.optionsContainer.innerHTML = '';
+            question.options.forEach((option, index) => {
+                const optionEl = document.createElement('button');
+                optionEl.className = 'quiz-option';
+                optionEl.innerHTML = `<span class="quiz-option-letter">${String.fromCharCode(65 + index)}</span>${option}`;
+                optionEl.addEventListener('click', () => this.selectOption(index, optionEl));
+                this.optionsContainer.appendChild(optionEl);
+            });
+
+            // Hide footer during question
+            this.modalFooter.style.display = 'none';
+        },
+
+        selectOption(index, element) {
+            if (element.classList.contains('disabled')) return;
+
+            // Remove previous selection
+            document.querySelectorAll('.quiz-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+
+            // Add selection to clicked option
+            element.classList.add('selected');
+            this.selectedOption = index;
+
+            // Submit answer after a short delay
+            setTimeout(() => this.submitAnswer(), 200);
+        },
+
+        async submitAnswer() {
+            if (this.selectedOption === null) return;
+
+            // Disable all options
+            document.querySelectorAll('.quiz-option').forEach(opt => {
+                opt.classList.add('disabled');
+            });
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/action`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        type: 'quiz_submit_answer',
+                        answer_index: this.selectedOption
+                    })
+                });
+                const result = await response.json();
+
+                this.showExplanation(result);
+            } catch (error) {
+                console.error('Failed to submit answer:', error);
+                SoundSystem.play('error');
+                Toast.error('Quiz Error', 'Could not submit answer', 3000);
+            }
+        },
+
+        showExplanation(result) {
+            const answerResult = result.quiz?.last_answer_result;
+            const question = answerResult?.question || this.currentQuestion;
+            const isCorrect = answerResult?.is_correct ?? false;
+            const explanation = answerResult?.explanation || '';
+            const correctAnswer = answerResult?.correct_answer ?? 0;
+            const score = result.quiz?.score ?? 0;
+            const total = result.quiz?.total_answered ?? 0;
+
+            // Update options to show correct/incorrect
+            const options = document.querySelectorAll('.quiz-option');
+            options.forEach((opt, index) => {
+                opt.classList.remove('selected');
+                if (index === this.selectedOption) {
+                    opt.classList.add(isCorrect ? 'correct' : 'incorrect');
+                } else if (index === correctAnswer) {
+                    opt.classList.add('correct');
+                }
+            });
+
+            // Show explanation
+            this.questionScreen.style.display = 'none';
+            this.explanation.style.display = 'block';
+            this.explanation.className = 'quiz-explanation ' + (isCorrect ? 'correct' : 'incorrect');
+
+            this.explanationIcon.textContent = isCorrect ? '✅' : '❌';
+            this.explanationTitle.textContent = isCorrect ? 'Правильно!' : 'Неправильно!';
+            this.explanationText.textContent = explanation;
+
+            // Update score display
+            this.scoreDisplay.textContent = score;
+            this.totalDisplay.textContent = total;
+
+            // Play sound
+            SoundSystem.play(isCorrect ? 'success' : 'error');
+
+            // Check if quiz is complete
+            if (result.quiz?.remaining === 0) {
+                this.nextBtn.textContent = 'Завершить викторину';
+            } else {
+                this.nextBtn.textContent = 'Следующий вопрос';
+            }
+        },
+
+        async nextQuestion() {
+            if (this.nextBtn.textContent === 'Завершить викторину') {
+                // Show final results
+                const score = this.scoreDisplay.textContent;
+                const total = this.totalDisplay.textContent;
+                this.showFinalResults(parseInt(score), parseInt(total));
+            } else {
+                // Load next question
+                await this.startQuestion();
+            }
+        },
+
+        showFinalResults(score, total) {
+            this.questionScreen.style.display = 'none';
+            this.explanation.style.display = 'none';
+            this.resultScreen.style.display = 'block';
+            this.modalFooter.style.display = 'flex';
+
+            const percentage = Math.round((score / total) * 100);
+            let icon, title;
+
+            if (percentage >= 80) {
+                icon = '🏆';
+                title = 'Превосходно!';
+            } else if (percentage >= 60) {
+                icon = '👍';
+                title = 'Хороший результат!';
+            } else if (percentage >= 40) {
+                icon = '📚';
+                title = 'Есть к чему стремиться';
+            } else {
+                icon = '💪';
+                title = 'Продолжай учиться!';
+            }
+
+            this.resultIcon.textContent = icon;
+            this.resultTitle.textContent = title;
+            this.resultText.textContent = `Ты ответил правильно на ${score} из ${total} вопросов (${percentage}%)`;
+
+            // Update start button for restart
+            this.startBtn.style.display = 'inline-block';
+            this.startBtn.textContent = 'Начать заново';
+
+            if (percentage >= 60) {
+                SoundSystem.play('levelUp');
+            } else {
+                SoundSystem.play('success');
+            }
+
+            Toast.success('Quiz Complete', `Score: ${score}/${total}`, 3000);
+        },
+
+        showResults(quizData) {
+            const score = quizData.score ?? 0;
+            const total = quizData.total_answered ?? 0;
+            this.showFinalResults(score, total);
+        }
+    };
+
+    Quiz.init();
+
     init();
 });
