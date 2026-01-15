@@ -20,6 +20,16 @@
             <div class="sidebar-section">
                 <h3>LEVEL <span id="level-display">1</span></h3>
                 <p class="level-title">The Stabilizer</p>
+                <!-- Level Progress Bar -->
+                <div class="level-progress-container">
+                    <div class="level-progress-label">
+                        <span>Progress</span>
+                        <span id="level-progress-text">0/3</span>
+                    </div>
+                    <div class="level-progress-bar-bg">
+                        <div class="level-progress-bar-fill" id="level-progress-bar" style="width: 0%;"></div>
+                    </div>
+                </div>
             </div>
 
             <!-- SPRINT PANEL -->
@@ -45,6 +55,14 @@
             </div>
 
             <div class="sidebar-section spacer"></div>
+
+            <!-- ACHIEVEMENTS SECTION -->
+            <div class="sidebar-section achievements-section">
+                <h3>ACHIEVEMENTS</h3>
+                <div id="achievements-container" class="achievements-container">
+                    <div class="no-achievements">Complete goals to earn badges</div>
+                </div>
+            </div>
 
             <div class="sidebar-menu">
                 <button id="new-game-btn" class="menu-btn">Restart Level</button>
@@ -277,7 +295,7 @@
     </div>
 
     <!-- Toast Notification Container -->
-    <div id="toast-container"></div>
+    <div id="toast-container" class="toast-container"></div>
 
     <!-- Sound Toggle Button -->
     <button id="sound-toggle" title="Toggle sound effects">🔊</button>
