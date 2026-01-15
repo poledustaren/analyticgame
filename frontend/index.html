@@ -294,6 +294,28 @@
         </div>
     </div>
 
+    <!-- EVENT MODAL -->
+    <div id="event-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content event-modal">
+            <div class="modal-header event-header">
+                <div class="event-header-left">
+                    <h2 id="event-title">Event Title</h2>
+                    <div class="event-badges">
+                        <span id="event-type-badge" class="event-type-badge">TECHNICAL</span>
+                        <span id="event-severity-badge" class="event-severity-badge">HIGH</span>
+                    </div>
+                </div>
+                <div class="event-icon" id="event-icon">🐛</div>
+            </div>
+            <div class="modal-body">
+                <p id="event-description" class="event-description">Event description goes here...</p>
+                <div class="event-choices" id="event-choices">
+                    <!-- Choices will be dynamically inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notification Container -->
     <div id="toast-container" class="toast-container"></div>
 
