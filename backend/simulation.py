@@ -1341,6 +1341,7 @@ class SimulationEngine:
         elif action_type == 'poker_vote': self._handle_poker_vote(action)
         elif action_type == 'poker_apply': self._handle_poker_apply(action)
         elif action_type == 'poker_cancel': self._handle_poker_cancel(action)
+        elif action_type == 'poker_estimate': self._handle_poker_estimate(action)
         # Quiz actions
         elif action_type == 'quiz_start': self._handle_quiz_start(action)
         elif action_type == 'quiz_submit_answer': self._handle_quiz_submit_answer(action)
@@ -2041,6 +2042,38 @@ class SimulationEngine:
         """Отменить сессию Planning Poker."""
         self.planning_poker_session = None
         self.active_game_state.chat_history.append({"sender": "System", "text": "Planning Poker отменен."})
+
+    def _handle_poker_estimate(self, action):
+        """Применить оценку Planning Poker напрямую к задаче."""
+        state = self.active_game_state
+        task_id = action.get('task_id')
+        estimate = action.get('estimate', 0)
+
+        # Find and update the task
+        task_found = False
+        task_title = ""
+        for col in state.tasks.values():
+            for t in col:
+                if t['id'] == task_id:
+                    old_points = t.get('points', 0)
+                    t['points'] = estimate
+                    task_found = True
+                    task_title = t.get('title', 'Unknown')
+                    break
+            if task_found:
+                break
+
+        if task_found:
+            state.chat_history.append({
+                "sender": "System",
+                "text": f"🃏 Planning Poker: Задача '{task_title}' оценена в {estimate} pts (было {old_points})"
+            })
+            state.mentor_log.append({
+                "sender": "Erik",
+                "text": f"Good work! Team consensus on {estimate} story points. This estimation technique helps reveal different perspectives."
+            })
+        else:
+            state.chat_history.append({"sender": "System", "text": "❌ Задача не найдена."})
 
     # --- Quiz Handlers ---
 
