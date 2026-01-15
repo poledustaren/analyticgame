@@ -345,6 +345,62 @@
         </div>
     </div>
 
+    <!-- QUIZ MODAL -->
+    <div id="quiz-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content quiz-modal">
+            <div class="modal-header">
+                <h2>🧠 DevOps Quiz</h2>
+                <button class="modal-close" id="quiz-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Quiz Start Screen -->
+                <div id="quiz-start-screen" class="quiz-screen">
+                    <div class="quiz-intro">
+                        <p>Проверь свои знания DevOps и концепций из The Phoenix Project!</p>
+                        <ul class="quiz-info">
+                            <li><span class="quiz-icon">📝</span> 8 вопросов о DevOps</li>
+                            <li><span class="quiz-icon">⏱️</span> Без лимита времени</li>
+                            <li><span class="quiz-icon">💡</span> С объяснениями после каждого ответа</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Quiz Question Screen -->
+                <div id="quiz-question-screen" class="quiz-screen" style="display: none;">
+                    <div class="quiz-progress">
+                        <span class="quiz-progress-text">Вопрос <span id="quiz-current-num">1</span> из <span id="quiz-total-num">8</span></span>
+                        <div class="quiz-score">Счёт: <span id="quiz-score">0</span>/<span id="quiz-total">0</span></div>
+                    </div>
+                    <div class="quiz-question" id="quiz-question-text">Загрузка вопроса...</div>
+                    <div class="quiz-options" id="quiz-options-container">
+                        <!-- Options will be inserted here -->
+                    </div>
+                </div>
+
+                <!-- Quiz Result Screen -->
+                <div id="quiz-result-screen" class="quiz-screen" style="display: none;">
+                    <div class="quiz-result">
+                        <div class="quiz-result-icon" id="quiz-result-icon">🏆</div>
+                        <h3 class="quiz-result-title" id="quiz-result-title">Отлично!</h3>
+                        <p class="quiz-result-text" id="quiz-result-text">Ты ответил правильно на 5 из 8 вопросов</p>
+                    </div>
+                </div>
+
+                <!-- Quiz Explanation (shown after answering) -->
+                <div id="quiz-explanation" class="quiz-explanation" style="display: none;">
+                    <div class="explanation-icon" id="explanation-icon">✅</div>
+                    <h4 id="explanation-title">Правильно!</h4>
+                    <p id="explanation-text">Объяснение появится здесь.</p>
+                    <button class="modal-btn primary" id="quiz-next-question">Следующий вопрос</button>
+                </div>
+            </div>
+            <div class="modal-footer" id="quiz-modal-footer">
+                <button class="modal-btn secondary" id="quiz-cancel">Отмена</button>
+                <button class="modal-btn primary" id="quiz-start-btn">Начать викторину</button>
+            </div>
+        </div>
+    </div>
+
     <!-- EVENT MODAL -->
     <div id="event-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content event-modal">
@@ -366,6 +422,9 @@
             </div>
         </div>
     </div>
+
+    <!-- Quiz Toggle Button (in sidebar) -->
+    <button id="quiz-toggle-btn" class="quiz-toggle-btn" title="DevOps Quiz">🧠 Quiz</button>
 
     <!-- Toast Notification Container -->
     <div id="toast-container" class="toast-container"></div>

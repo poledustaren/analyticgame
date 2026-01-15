@@ -1158,6 +1158,7 @@ class QuizSession:
         self.score = 0
         self.total_answered = 0
         self.answered_questions = []
+        self.last_answer_result = None  # Store last answer result for frontend
 
     def get_random_question(self):
         """Возвращает случайный вопрос, который еще не был задан."""
@@ -1194,6 +1195,7 @@ class QuizSession:
         }
 
         self.current_question = None
+        self.last_answer_result = result  # Store for frontend access
         return result
 
     def to_dict(self):
@@ -1201,7 +1203,8 @@ class QuizSession:
             "current_question": self.current_question,
             "score": self.score,
             "total_answered": self.total_answered,
-            "remaining": len(self.QUESTIONS) - len(self.answered_questions)
+            "remaining": len(self.QUESTIONS) - len(self.answered_questions),
+            "last_answer_result": self.last_answer_result
         }
 
 class SimulationEngine:
@@ -1242,7 +1245,9 @@ class SimulationEngine:
         self.active_game_state = GameState()
         self.event_generator.reset_triggered()
         self._initialize_level_1()
-        return self.active_game_state.to_dict()
+        # Reset quiz session for new game
+        self.quiz_session = QuizSession()
+        return self.get_current_state()
 
     def get_llm_response(self, role: str, context: Optional[Dict] = None) -> str:
         """
