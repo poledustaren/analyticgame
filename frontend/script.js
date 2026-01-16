@@ -285,6 +285,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const resourcePool = document.getElementById('resource-pool');
     const newGameBtn = document.getElementById('new-game-btn');
     const saveGameBtn = document.getElementById('save-game-btn');
+    // Training Elements
+    const trainingSection = document.getElementById('training-section');
+    const trainingStatus = document.getElementById('training-status');
+    const trainBtn = document.getElementById('train-btn');
+    const advanceWeekBtn = document.getElementById('advance-week-btn');
     // Sprint Elements
     const sprintStatus = document.getElementById('sprint-status');
     const sprintBtn = document.getElementById('sprint-btn');
@@ -645,6 +650,10 @@ document.addEventListener('DOMContentLoaded', () => {
         newGameBtn.onclick = startNewGame;
         saveGameBtn.onclick = handleSaveGame;
 
+        // Training Event Listeners
+        trainBtn.onclick = handleTrainDeveloper;
+        advanceWeekBtn.onclick = handleAdvanceWeek;
+
         // Sprint Event Listeners
         sprintBtn.onclick = handleSprintButtonClick;
 
@@ -686,6 +695,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Auto-start new game
         startNewGame();
+    }
+
+    async function handleTrainDeveloper() {
+        await sendAction({ type: 'train_developer' });
+    }
+
+    async function handleAdvanceWeek() {
+        await sendAction({ type: 'advance_week' });
     }
 
     async function startNewGame() {
@@ -1026,7 +1043,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // 5. Logs
         renderLogs(state.mentor_log, state.chat_history);
 
-        // 6. Velocity Chart
+        // 6. Training Section (Level 2+)
+        renderTraining(state);
+
+        // 7. Velocity Chart
         renderVelocity(state.velocity_history || []);
 
         // 7. CI/CD Pipeline (Level 3+)
@@ -1037,6 +1057,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 8. Check for pending events
         checkForPendingEvent(state);
+    }
+
+    function renderTraining(state) {
+        // Show training section only in Level 2+
+        if (state.level >= 2) {
+            trainingSection.style.display = 'block';
+        } else {
+            trainingSection.style.display = 'none';
+            return;
+        }
+
+        // Update training status
+        if (state.training_in_progress) {
+            const weeks = state.training_in_progress.weeks_remaining;
+            trainingStatus.innerHTML = `
+                <p class="training-active">Брент обучает стажера...</p>
+                <p class="training-countdown">${weeks} недель(и) осталось</p>
+            `;
+            trainBtn.disabled = true;
+            trainBtn.textContent = 'Training in Progress...';
+        } else {
+            trainingStatus.innerHTML = `
+                <p class="training-idle">Брент может обучить новых разработчиков.</p>
+                <p class="training-hint">Обучение займет 3 недели, но снизит зависимость от Брента.</p>
+            `;
+            trainBtn.disabled = false;
+            trainBtn.textContent = 'Train Developer (3 weeks)';
+        }
     }
 
     // --- Sprint Rendering ---
