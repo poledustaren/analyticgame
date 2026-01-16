@@ -771,6 +771,12 @@ class GameState:
         self.level_goals = []  # List of {'id': str, 'description': str, 'current': int, 'target': int, 'completed': bool}
         self.level_complete = None  # {'level': int, 'message': str, 'stats': dict} or None - shows modal when level is done
 
+        # Game Over State
+        self.game_over = None  # {'reason': str, 'title': str, 'message': str} or None
+
+        # Level Up State
+        self.level_up = None  # {'from': int, 'to': int, 'message': str} or None
+
         # Sprint System
         self.current_sprint = None
         self.sprint_history = []
@@ -1512,6 +1518,19 @@ class SimulationEngine:
 
         return state.to_dict()
 
+    def dismiss_notification(self, notification_type):
+        """Отклоняет уведомление и очищает его состояние."""
+        if not self.active_game_state:
+            return {"error": "Нет активной игры."}
+
+        state = self.active_game_state
+        if notification_type == 'game_over':
+            state.game_over = None
+        elif notification_type == 'level_up':
+            state.level_up = None
+
+        return state.to_dict()
+
     def get_current_state(self):
         if not self.active_game_state: return {"error": "Нет активной игры."}
         state = self.active_game_state.to_dict()
@@ -1743,7 +1762,7 @@ class SimulationEngine:
             'message': 'LEVEL UP! Ты потушил все пожары. Теперь учись видеть поток.',
             'stats': {
                 'title': 'The Visualizer',
-                'objective': 'Maintain 80%+ stability while completing 5 tasks.'
+                'objective': 'Maintain 80%+ stability for 3 weeks while completing business value.'
             }
         }
 
