@@ -568,6 +568,261 @@ class Sprint:
             "retro_notes": self.retro_notes
         }
 
+class ExperimentType(Enum):
+    """Types of experiments available in the game."""
+    PROCESS = "process"           # Process improvement experiments
+    TECHNICAL = "technical"       # Technical/infrastructure experiments
+    ORGANIZATIONAL = "organizational"  # Team/organizational experiments
+    CULTURAL = "cultural"         # Culture/morale experiments
+
+class ExperimentStatus(Enum):
+    """Status of an experiment."""
+    DRAFT = "draft"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+class Experiment:
+    """Represents an experiment in the game."""
+    def __init__(self, exp_id: str, title: str, description: str,
+                 experiment_type: ExperimentType, duration_weeks: int = 1,
+                 cost: int = 0, risk_level: int = 1):
+        """
+        Args:
+            exp_id: Unique identifier
+            title: Experiment name
+            description: What the experiment tests
+            experiment_type: Type of experiment
+            duration_weeks: How long it takes (1-4 weeks)
+            cost: Budget cost to run
+            risk_level: 1-5, affects failure chance and negative consequences
+        """
+        self.id = exp_id
+        self.title = title
+        self.description = description
+        self.type = experiment_type
+        self.duration_weeks = duration_weeks
+        self.cost = cost
+        self.risk_level = risk_level
+        self.status = ExperimentStatus.DRAFT
+
+        # Results (populated when completed)
+        self.hypothesis = ""  # What we're testing
+        self.outcome = None  # Positive, Negative, or Mixed
+        self.metrics_impact = {}  # Actual impact on metrics
+        self.learnings = []  # Textual learnings
+
+        # Tracking
+        self.weeks_remaining = duration_weeks
+        self.start_week = None
+        self.end_week = None
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "title": self.title,
+            "description": self.description,
+            "type": self.type.value,
+            "duration_weeks": self.duration_weeks,
+            "cost": self.cost,
+            "risk_level": self.risk_level,
+            "status": self.status.value,
+            "hypothesis": self.hypothesis,
+            "outcome": self.outcome,
+            "metrics_impact": self.metrics_impact,
+            "learnings": self.learnings,
+            "weeks_remaining": self.weeks_remaining,
+            "start_week": self.start_week,
+            "end_week": self.end_week
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        exp = cls(
+            exp_id=data["id"],
+            title=data["title"],
+            description=data["description"],
+            experiment_type=ExperimentType(data["type"]),
+            duration_weeks=data.get("duration_weeks", 1),
+            cost=data.get("cost", 0),
+            risk_level=data.get("risk_level", 1)
+        )
+        exp.status = ExperimentStatus(data.get("status", "draft"))
+        exp.hypothesis = data.get("hypothesis", "")
+        exp.outcome = data.get("outcome")
+        exp.metrics_impact = data.get("metrics_impact", {})
+        exp.learnings = data.get("learnings", [])
+        exp.weeks_remaining = data.get("weeks_remaining", exp.duration_weeks)
+        exp.start_week = data.get("start_week")
+        exp.end_week = data.get("end_week")
+        return exp
+
+class ExperimentTemplate:
+    """Predefined experiment templates that players can use."""
+    TEMPLATES = [
+        {
+            "id": "exp-wip-limit",
+            "title": "WIP Limit Reduction",
+            "description": "Test if reducing WIP limit improves flow and cycle time.",
+            "type": ExperimentType.PROCESS,
+            "duration_weeks": 2,
+            "cost": 2000,
+            "risk_level": 2,
+            "hypothesis": "Lower WIP limits will reduce cycle time and increase throughput.",
+            "possible_outcomes": [
+                {"outcome": "positive", "probability": 0.6, "impacts": {"process_efficiency": 10, "stability": 5}},
+                {"outcome": "neutral", "probability": 0.3, "impacts": {"process_efficiency": 2}},
+                {"outcome": "negative", "probability": 0.1, "impacts": {"stability": -10, "morale": -5}}
+            ]
+        },
+        {
+            "id": "exp-automated-deploy",
+            "title": "Automated Deployment",
+            "description": "Implement automated deployment pipeline.",
+            "type": ExperimentType.TECHNICAL,
+            "duration_weeks": 3,
+            "cost": 15000,
+            "risk_level": 3,
+            "hypothesis": "Automated deployments will reduce errors and increase deployment frequency.",
+            "possible_outcomes": [
+                {"outcome": "positive", "probability": 0.5, "impacts": {"cicd_coverage": 30, "stability": 10, "quality_score": 10}},
+                {"outcome": "neutral", "probability": 0.4, "impacts": {"cicd_coverage": 15}},
+                {"outcome": "negative", "probability": 0.1, "impacts": {"stability": -15, "budget": -5000}}
+            ]
+        },
+        {
+            "id": "exp-pair-programming",
+            "title": "Pair Programming Sessions",
+            "description": "Test pair programming for knowledge sharing.",
+            "type": ExperimentType.ORGANIZATIONAL,
+            "duration_weeks": 2,
+            "cost": 5000,
+            "risk_level": 1,
+            "hypothesis": "Pair programming will increase knowledge sharing and code quality.",
+            "possible_outcomes": [
+                {"outcome": "positive", "probability": 0.7, "impacts": {"knowledge": 15, "bus_factor": 1, "quality_score": 10}},
+                {"outcome": "neutral", "probability": 0.25, "impacts": {"knowledge": 5}},
+                {"outcome": "negative", "probability": 0.05, "impacts": {"morale": -5}}
+            ]
+        },
+        {
+            "id": "exp-failure-friday",
+            "title": "Failure Friday (Blameless Postmortems)",
+            "description": "Weekly blameless postmortem sessions to learn from failures.",
+            "type": ExperimentType.CULTURAL,
+            "duration_weeks": 4,
+            "cost": 3000,
+            "risk_level": 1,
+            "hypothesis": "Blameless postmortems will improve learning rate and reduce fear of failure.",
+            "possible_outcomes": [
+                {"outcome": "positive", "probability": 0.8, "impacts": {"learning_rate": 20, "morale": 10, "quality_score": 5}},
+                {"outcome": "neutral", "probability": 0.2, "impacts": {"learning_rate": 5}}
+            ]
+        },
+        {
+            "id": "exp-feature-flag",
+            "title": "Feature Flag System",
+            "description": "Implement feature flags for safer deployments.",
+            "type": ExperimentType.TECHNICAL,
+            "duration_weeks": 3,
+            "cost": 10000,
+            "risk_level": 2,
+            "hypothesis": "Feature flags will enable safer deployments and faster rollbacks.",
+            "possible_outcomes": [
+                {"outcome": "positive", "probability": 0.6, "impacts": {"cicd_coverage": 20, "stability": 15}},
+                {"outcome": "neutral", "probability": 0.35, "impacts": {"cicd_coverage": 10}},
+                {"outcome": "negative", "probability": 0.05, "impacts": {"quality_score": -5}}
+            ]
+        },
+        {
+            "id": "exp-20-time",
+            "title": "20% Time for Innovation",
+            "description": "Give team 20% time for experimental projects.",
+            "type": ExperimentType.CULTURAL,
+            "duration_weeks": 4,
+            "cost": 8000,
+            "risk_level": 2,
+            "hypothesis": "Innovation time will boost morale and generate new ideas.",
+            "possible_outcomes": [
+                {"outcome": "positive", "probability": 0.5, "impacts": {"morale": 20, "experiment_velocity": 10}},
+                {"outcome": "neutral", "probability": 0.4, "impacts": {"morale": 10}},
+                {"outcome": "negative", "probability": 0.1, "impacts": {"stability": -10}}
+            ]
+        },
+        {
+            "id": "exp-value-stream",
+            "title": "Value Stream Mapping Workshop",
+            "description": "Map and eliminate waste in value streams.",
+            "type": ExperimentType.PROCESS,
+            "duration_weeks": 2,
+            "cost": 4000,
+            "risk_level": 1,
+            "hypothesis": "VSM will identify waste and improve process efficiency.",
+            "possible_outcomes": [
+                {"outcome": "positive", "probability": 0.7, "impacts": {"vsm_ratio": -15, "process_efficiency": 15}},
+                {"outcome": "neutral", "probability": 0.25, "impacts": {"vsm_ratio": -5}},
+                {"outcome": "negative", "probability": 0.05, "impacts": {}}
+            ]
+        },
+        {
+            "id": "exp-observability",
+            "title": "Observability Platform",
+            "description": "Implement comprehensive monitoring and observability.",
+            "type": ExperimentType.TECHNICAL,
+            "duration_weeks": 4,
+            "cost": 20000,
+            "risk_level": 3,
+            "hypothesis": "Better observability will reduce MTTR and improve stability.",
+            "possible_outcomes": [
+                {"outcome": "positive", "probability": 0.5, "impacts": {"stability": 20, "quality_score": 15, "cicd_coverage": 10}},
+                {"outcome": "neutral", "probability": 0.4, "impacts": {"stability": 5}},
+                {"outcome": "negative", "probability": 0.1, "impacts": {"budget": -5000}}
+            ]
+        },
+        {
+            "id": "exp-doc-sprint",
+            "title": "Documentation Sprint",
+            "description": "Dedicated sprint for documentation and knowledge capture.",
+            "type": ExperimentType.ORGANIZATIONAL,
+            "duration_weeks": 1,
+            "cost": 6000,
+            "risk_level": 1,
+            "hypothesis": "Focused documentation will improve bus factor and knowledge sharing.",
+            "possible_outcomes": [
+                {"outcome": "positive", "probability": 0.75, "impacts": {"knowledge": 25, "bus_factor": 1}},
+                {"outcome": "neutral", "probability": 0.2, "impacts": {"knowledge": 10}},
+                {"outcome": "negative", "probability": 0.05, "impacts": {"stability": -5}}
+            ]
+        },
+        {
+            "id": "exp-chaos-engineering",
+            "title": "Chaos Engineering",
+            "description": "Controlled failure experiments to test resilience.",
+            "type": ExperimentType.TECHNICAL,
+            "duration_weeks": 3,
+            "cost": 12000,
+            "risk_level": 4,
+            "hypothesis": "Proactive failure testing will uncover weaknesses and improve resilience.",
+            "possible_outcomes": [
+                {"outcome": "positive", "probability": 0.4, "impacts": {"stability": 25, "quality_score": 20}},
+                {"outcome": "neutral", "probability": 0.5, "impacts": {"stability": 5}},
+                {"outcome": "negative", "probability": 0.1, "impacts": {"stability": -20, "budget": -8000}}
+            ]
+        }
+    ]
+
+    @classmethod
+    def get_template(cls, template_id: str):
+        for template in cls.TEMPLATES:
+            if template["id"] == template_id:
+                return template
+        return None
+
+    @classmethod
+    def all_templates(cls):
+        return cls.TEMPLATES
+
 class GameState:
     """Хранит все данные о текущем состоянии игры."""
     def __init__(self):
@@ -590,6 +845,11 @@ class GameState:
         self.experiment_velocity = 5  # Number of experiments per sprint
         self.cicd_coverage = 0  # CI/CD automation percentage
         self.quality_score = 30  # Code quality metric
+
+        # Experiments system (Level 6)
+        self.experiments = []  # List of Experiment objects
+        self.experiment_counter = 0
+        self.completed_experiments_count = 0
 
         # Logs
         self.chat_history = [{"sender": "System", "text": "Добро пожаловать в симулятор 'Проект Феникс'!"}]
@@ -650,6 +910,8 @@ class GameState:
              "choice_id": e["choice_id"], "consequences": e["consequences"]}
             for e in self.event_history
         ]
+        # Serialize experiments
+        data['experiments'] = [exp.to_dict() for exp in self.experiments]
         return data
 
     @classmethod
@@ -678,6 +940,12 @@ class GameState:
                     sprint.end_time = datetime.fromisoformat(sprint_data['end_time'])
                 sprints.append(sprint)
             data['sprint_history'] = sprints
+        # Handle experiment deserialization
+        if 'experiments' in data:
+            experiments = []
+            for exp_data in data['experiments']:
+                experiments.append(Experiment.from_dict(exp_data))
+            data['experiments'] = experiments
         instance.__dict__.update(data)
         return instance
 
@@ -1344,6 +1612,10 @@ class SimulationEngine:
         # Quiz actions
         elif action_type == 'quiz_start': self._handle_quiz_start(action)
         elif action_type == 'quiz_submit_answer': self._handle_quiz_submit_answer(action)
+        # Experiment actions
+        elif action_type == 'experiment_create': self._handle_experiment_create(action)
+        elif action_type == 'experiment_start': self._handle_experiment_start(action)
+        elif action_type == 'experiment_cancel': self._handle_experiment_cancel(action)
 
         self._check_level_transition()
         self._try_trigger_event()
@@ -1789,6 +2061,9 @@ class SimulationEngine:
             else:
                 state.chat_history.append({"sender": "System", "text": f"Обучение продолжается. Осталось {state.training_in_progress['weeks_remaining']} нед."})
 
+        # Update experiment progress
+        self._advance_experiments()
+
         # Update task progress (simplified - tasks in progress may move to review)
         # This is a basic implementation; real game would have more sophisticated progress
         state.chat_history.append({"sender": "System", "text": f"--- Неделя {state.week} ---"})
@@ -2070,5 +2345,210 @@ class SimulationEngine:
             else:
                 state.chat_history.append({"sender": "System", "text": f"❌ Неправильно. {result['explanation']}"})
                 state.mentor_log.append({"sender": "Эрик", "text": "Не страшно ошибаться — главное, учиться на ошибках."})
+
+    # --- Experiment Handlers ---
+
+    def _handle_experiment_create(self, action):
+        """Создать новый эксперимент из шаблона или кастомный."""
+        state = self.active_game_state
+
+        # Check if experiments are available (Level 5+)
+        if state.level < 5:
+            state.chat_history.append({"sender": "System", "text": "Эксперименты доступны на Уровне 5 и выше."})
+            return
+
+        template_id = action.get('template_id')
+        custom_data = action.get('custom_data')  # For custom experiments
+
+        if template_id:
+            # Create from template
+            template = ExperimentTemplate.get_template(template_id)
+            if not template:
+                state.chat_history.append({"sender": "System", "text": "Шаблон эксперимента не найден."})
+                return
+
+            # Check budget
+            if state.budget < template['cost']:
+                state.chat_history.append({"sender": "System", "text": f"Недостаточно бюджета. Нужно: ${template['cost']}"})
+                return
+
+            # Create experiment
+            state.experiment_counter += 1
+            exp = Experiment(
+                exp_id=f"exp-{state.experiment_counter}",
+                title=template['title'],
+                description=template['description'],
+                experiment_type=template['type'],
+                duration_weeks=template['duration_weeks'],
+                cost=template['cost'],
+                risk_level=template['risk_level']
+            )
+            exp.hypothesis = template['hypothesis']
+            # Store template outcomes for later use
+            exp._template_outcomes = template['possible_outcomes']
+
+        elif custom_data:
+            # Create custom experiment
+            state.experiment_counter += 1
+            exp = Experiment(
+                exp_id=f"exp-{state.experiment_counter}",
+                title=custom_data.get('title', 'Custom Experiment'),
+                description=custom_data.get('description', ''),
+                experiment_type=ExperimentType(custom_data.get('type', 'process')),
+                duration_weeks=custom_data.get('duration_weeks', 1),
+                cost=custom_data.get('cost', 0),
+                risk_level=custom_data.get('risk_level', 1)
+            )
+            exp.hypothesis = custom_data.get('hypothesis', '')
+        else:
+            state.chat_history.append({"sender": "System", "text": "Укажите template_id или custom_data для создания эксперимента."})
+            return
+
+        state.experiments.append(exp)
+        state.chat_history.append({"sender": "System", "text": f"🧪 Эксперимент '{exp.title}' создан. Запустите его, когда будете готовы."})
+        state.mentor_log.append({"sender": "Эрик", "text": f"Эксперимент создан. Помни: каждый эксперимент — это обучение, независимо от результата."})
+
+    def _handle_experiment_start(self, action):
+        """Запустить эксперимент."""
+        state = self.active_game_state
+        exp_id = action.get('exp_id')
+
+        # Find the experiment
+        exp = next((e for e in state.experiments if e.id == exp_id), None)
+        if not exp:
+            state.chat_history.append({"sender": "System", "text": "Эксперимент не найден."})
+            return
+
+        if exp.status != ExperimentStatus.DRAFT:
+            state.chat_history.append({"sender": "System", "text": "Этот эксперимент уже запущен или завершен."})
+            return
+
+        # Check if another experiment is already running
+        running = [e for e in state.experiments if e.status == ExperimentStatus.RUNNING]
+        if running:
+            state.chat_history.append({"sender": "System", "text": "Уже запущен эксперимент. Дождитесь его завершения."})
+            return
+
+        # Check budget
+        if state.budget < exp.cost:
+            state.chat_history.append({"sender": "System", "text": f"Недостаточно бюджета. Нужно: ${exp.cost}"})
+            return
+
+        # Deduct cost and start experiment
+        state.budget -= exp.cost
+        exp.status = ExperimentStatus.RUNNING
+        exp.start_week = state.week
+        exp.weeks_remaining = exp.duration_weeks
+
+        state.chat_history.append({"sender": "System", "text": f"🚀 Эксперимент '{exp.title}' запущен! Длительность: {exp.duration_weeks} нед."})
+        state.mentor_log.append({"sender": "Эрик", "text": f"Эксперимент начат. Наблюдайте за результатами. {exp.duration_weeks} недель до завершения."})
+
+    def _handle_experiment_cancel(self, action):
+        """Отменить эксперимент."""
+        state = self.active_game_state
+        exp_id = action.get('exp_id')
+
+        exp = next((e for e in state.experiments if e.id == exp_id), None)
+        if not exp:
+            return
+
+        if exp.status != ExperimentStatus.DRAFT and exp.status != ExperimentStatus.RUNNING:
+            state.chat_history.append({"sender": "System", "text": "Можно отменить только черновик или активный эксперимент."})
+            return
+
+        exp.status = ExperimentStatus.CANCELLED
+        state.chat_history.append({"sender": "System", "text": f"❌ Эксперимент '{exp.title}' отменен."})
+
+    def _advance_experiments(self):
+        """Обновить прогресс запущенных экспериментов."""
+        state = self.active_game_state
+
+        for exp in state.experiments:
+            if exp.status == ExperimentStatus.RUNNING:
+                exp.weeks_remaining -= 1
+
+                if exp.weeks_remaining <= 0:
+                    # Experiment complete! Generate results
+                    self._complete_experiment(exp)
+
+    def _complete_experiment(self, exp):
+        """Завершить эксперимент и сгенерировать результаты."""
+        state = self.active_game_state
+        exp.status = ExperimentStatus.COMPLETED
+        exp.end_week = state.week
+        state.completed_experiments_count += 1
+
+        # Generate outcome
+        if hasattr(exp, '_template_outcomes'):
+            # Use predefined outcomes
+            outcomes = exp._template_outcomes
+            roll = random.random()
+            cumulative = 0
+
+            selected_outcome = outcomes[0]  # Default to first
+            for outcome in outcomes:
+                cumulative += outcome['probability']
+                if roll <= cumulative:
+                    selected_outcome = outcome
+                    break
+        else:
+            # Generate generic outcome based on risk level
+            success_chance = 0.7 - (exp.risk_level * 0.1)
+            if random.random() < success_chance:
+                selected_outcome = {"outcome": "positive", "impacts": {"learning_rate": 5}}
+            else:
+                selected_outcome = {"outcome": "neutral", "impacts": {"learning_rate": 2}}
+
+        exp.outcome = selected_outcome['outcome']
+        exp.metrics_impact = selected_outcome['impacts']
+
+        # Apply impacts to game state
+        applied = []
+        for metric, value in exp.metrics_impact.items():
+            if hasattr(state, metric):
+                if metric == 'budget':
+                    state.budget += value
+                    applied.append(f"Budget {'+$' if value >= 0 else '-$'}{abs(value)}")
+                elif metric in ['stability', 'morale', 'knowledge', 'process_efficiency',
+                               'learning_rate', 'cicd_coverage', 'quality_score']:
+                    old_value = getattr(state, metric)
+                    new_value = max(0, min(100, old_value + value))
+                    setattr(state, metric, new_value)
+                    applied.append(f"{metric.capitalize()} {'+' if value >= 0 else ''}{value}%")
+                elif metric == 'bus_factor':
+                    state.bus_factor = max(1, state.bus_factor + value)
+                    applied.append(f"Bus Factor {'+' if value >= 0 else ''}{value}")
+                elif metric == 'vsm_ratio':
+                    state.vsm_ratio = max(0, state.vsm_ratio + value)
+                    applied.append(f"VSM Ratio {value}%")
+                elif metric == 'experiment_velocity':
+                    state.experiment_velocity = max(0, state.experiment_velocity + value)
+                    applied.append(f"Experiment Velocity {'+' if value >= 0 else ''}{value}")
+
+        # Generate learning message
+        if exp.outcome == 'positive':
+            emoji = "✅"
+            learning = f"Эксперимент '{exp.title}' успешен! Гипотеза подтверждена."
+        elif exp.outcome == 'negative':
+            emoji = "❌"
+            learning = f"Эксперимент '{exp.title}' не удался. Но мы узнали, что НЕ работает."
+        else:
+            emoji = "⚪"
+            learning = f"Эксперимент '{exp.title}' показал смешанные результаты."
+
+        exp.learnings.append(learning)
+
+        if applied:
+            learning += f" Эффекты: {', '.join(applied)}."
+
+        state.chat_history.append({"sender": "System", "text": f"{emoji} Эксперимент '{exp.title}' завершен! Результат: {exp.outcome}"})
+        state.mentor_log.append({"sender": "Эрик", "text": learning})
+
+        # Update experiment velocity based on completed experiments
+        # More experiments = higher velocity (team learns to experiment faster)
+        if state.completed_experiments_count > 0:
+            base_velocity = 5
+            velocity_boost = min(state.completed_experiments_count * 2, 20)
+            state.experiment_velocity = base_velocity + velocity_boost
 
 engine = SimulationEngine()

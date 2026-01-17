@@ -75,6 +75,102 @@ def get_llm_response():
     })
 
 
+# --- Experiment System API (Level 6) ---
+
+@app.route('/api/experiments/templates', methods=['GET'])
+def get_experiment_templates():
+    """Возвращает список доступных шаблонов экспериментов."""
+    from simulation import ExperimentTemplate
+    templates = ExperimentTemplate.all_templates()
+
+    # Convert Enums to strings for JSON serialization
+    result = []
+    for tmpl in templates:
+        result.append({
+            "id": tmpl["id"],
+            "title": tmpl["title"],
+            "description": tmpl["description"],
+            "type": tmpl["type"].value if hasattr(tmpl["type"], "value") else tmpl["type"],
+            "duration_weeks": tmpl["duration_weeks"],
+            "cost": tmpl["cost"],
+            "risk_level": tmpl["risk_level"],
+            "hypothesis": tmpl["hypothesis"]
+        })
+    return jsonify(result)
+
+@app.route('/api/experiments', methods=['GET'])
+def get_experiments():
+    """Возвращает список всех экспериментов в текущей игре."""
+    state = engine.active_game_state
+    if not state:
+        return jsonify({"error": "No active game"}), 400
+
+    return jsonify([exp.to_dict() for exp in state.experiments])
+
+@app.route('/api/experiments/create', methods=['POST'])
+def create_experiment():
+    """Создает новый эксперимент."""
+    data = request.json
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    engine.process_action({
+        'type': 'experiment_create',
+        'template_id': data.get('template_id'),
+        'custom_data': data.get('custom_data')
+    })
+    return jsonify(engine.get_current_state())
+
+@app.route('/api/experiments/start', methods=['POST'])
+def start_experiment():
+    """Запускает эксперимент."""
+    data = request.json
+    if not data or 'exp_id' not in data:
+        return jsonify({"error": "exp_id is required"}), 400
+
+    engine.process_action({
+        'type': 'experiment_start',
+        'exp_id': data['exp_id']
+    })
+    return jsonify(engine.get_current_state())
+
+@app.route('/api/experiments/cancel', methods=['POST'])
+def cancel_experiment():
+    """Отменяет эксперимент."""
+    data = request.json
+    if not data or 'exp_id' not in data:
+        return jsonify({"error": "exp_id is required"}), 400
+
+    engine.process_action({
+        'type': 'experiment_cancel',
+        'exp_id': data['exp_id']
+    })
+    return jsonify(engine.get_current_state())
+
+@app.route('/api/check_win', methods=['GET'])
+def check_win():
+    """Проверяет условия победы для текущего уровня."""
+    state = engine.active_game_state
+    if not state:
+        return jsonify({"error": "No active game"}), 400
+
+    win_conditions = {
+        "level": state.level,
+        "can_win": False,
+        "metrics": {}
+    }
+
+    if state.level == 6:
+        # Level 6 win condition: Learning rate 80%, Experiment Velocity 70
+        win_conditions["metrics"]["learning_rate"] = state.learning_rate
+        win_conditions["metrics"]["experiment_velocity"] = state.experiment_velocity
+        win_conditions["learning_rate_target"] = 80
+        win_conditions["experiment_velocity_target"] = 70
+        win_conditions["can_win"] = state.learning_rate >= 80 and state.experiment_velocity >= 70
+
+    return jsonify(win_conditions)
+
+
 # --- Маршрут для обслуживания фронтенда ---
 
 @app.route('/')
