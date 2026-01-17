@@ -26,6 +26,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const metricUnplannedBar = document.getElementById('metric-unplanned-bar');
     const metricUnplannedText = document.getElementById('metric-unplanned-text');
     const metricWeek = document.getElementById('metric-week');
+    const busFactorCard = document.getElementById('bus-factor-card');
+    const metricBusFactor = document.getElementById('metric-bus-factor');
+    const busFactorStatus = document.getElementById('bus-factor-status');
     // Board
     const wipCurrent = document.getElementById('wip-current');
     const wipLimit = document.getElementById('wip-limit');
@@ -141,6 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
         levelDisplay.textContent = state.level;
         if (state.level === 1) levelTitle.textContent = "The Stabilizer";
         else if (state.level === 2) levelTitle.textContent = "The First Way (Flow)";
+        else if (state.level === 4) levelTitle.textContent = "The Teacher (Bus Factor)";
 
         metricBudget.textContent = `$${state.budget.toLocaleString()}`;
         metricStability.textContent = `${state.stability}%`;
@@ -153,6 +157,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (unplannedPct > 50) metricUnplannedBar.style.backgroundColor = '#ef4444'; // Red
         else if (unplannedPct > 20) metricUnplannedBar.style.backgroundColor = '#f59e0b'; // Orange
         else metricUnplannedBar.style.backgroundColor = '#22c55e'; // Green
+
+        // Bus Factor (Level 4+)
+        renderBusFactor(state);
 
         // 2. Sprint UI
         renderSprint(state);
@@ -198,6 +205,33 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             trainBtn.disabled = false;
             trainBtn.textContent = 'Train Developer (3 weeks)';
+        }
+    }
+
+    function renderBusFactor(state) {
+        // Show Bus Factor only in Level 4+
+        const busFactor = state.bus_factor || 1;
+
+        if (state.level >= 4) {
+            busFactorCard.style.display = 'flex';
+            metricBusFactor.textContent = busFactor;
+
+            // Set status based on bus factor value
+            if (busFactor === 1) {
+                busFactorStatus.textContent = '⚠️ Critical';
+                busFactorStatus.style.color = '#ef4444';
+            } else if (busFactor === 2) {
+                busFactorStatus.textContent = '⚡ Risky';
+                busFactorStatus.style.color = '#f59e0b';
+            } else if (busFactor === 3) {
+                busFactorStatus.textContent = '👥 Good';
+                busFactorStatus.style.color = '#22c55e';
+            } else {
+                busFactorStatus.textContent = '🌟 Excellent';
+                busFactorStatus.style.color = '#3b82f6';
+            }
+        } else {
+            busFactorCard.style.display = 'none';
         }
     }
 

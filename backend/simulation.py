@@ -71,6 +71,10 @@ class GameState:
         self.phoenix_progress = 0
         self.wip_limit = 99
 
+        # Bus Factor Metric (Level 4)
+        self.bus_factor = 1  # Сколько человек нужно для standstill
+        self.knowledge_distribution = {}  # knowledge_area -> [resource_ids]
+
         # Logs
         self.chat_history = [{"sender": "System", "text": "Добро пожаловать в симулятор 'Проект Феникс'!"}]
         self.mentor_log = [{"sender": "Эрик", "text": "Наблюдай за потоком работы. Где твое ограничение?"}]
@@ -268,6 +272,19 @@ class SimulationEngine:
         state.chat_history.append({"sender": "System", "text": "НОВАЯ МЕХАНИКА: Брент может обучать других разработчиков. Это займет время, но снизит зависимость от одного узкого места."})
         state.mentor_log.append({"sender": "Эрик", "text": "Брент — твое узкое место. Ты можешь продолжать использовать его как затычку, ИЛИ он может обучить других. Выбор за тобой."})
 
+    def _initialize_level_4(self):
+        """Инициализация Level 4: Bus Factor система."""
+        state = self.active_game_state
+        state.level = 4
+
+        # Calculate initial bus factor
+        self._calculate_bus_factor()
+
+        state.chat_history.append({"sender": "System", "text": "--- УРОВЕНЬ 4: BUS FACTOR ---"})
+        state.mentor_log.append({"sender": "Эрик", "text": "Добро пожаловать на Level 4! Bus Factor — это метрика, которая показывает сколько разработчиков должны уйти, чтобы проект встал."})
+        state.chat_history.append({"sender": "System", "text": "НОВАЯ МЕТРИКА: Bus Factor отслеживает распределение знаний в команде."})
+        state.mentor_log.append({"sender": "Эрик", "text": f"Ваш текущий Bus Factor: {state.bus_factor}. Если Брент уйдет в отпуск или заболеет — всё встанет. Вам нужно повысить этот показатель!"})
+
     def _check_level_transition(self):
         state = self.active_game_state
 
@@ -279,6 +296,13 @@ class SimulationEngine:
             # (Assuming player didn't delete them, which isn't possible yet)
             if unplanned_done >= 3:
                  self._initialize_level_2()
+
+        # Level 2 -> Level 4 Transition (Bus Factor)
+        # Condition: Train at least 2 developers and achieve stability > 80
+        elif state.level == 2:
+            trained_count = len([r for r in state.resources if r.get('can_handle_brent_tasks', False) and r['id'] != 'brent'])
+            if trained_count >= 2 and state.stability >= 80:
+                self._initialize_level_4()
 
     # --- Action Handlers ---
 
@@ -455,6 +479,9 @@ class SimulationEngine:
                 state.chat_history.append({"sender": "System", "text": f"Обучение завершено! {trainee_name} теперь готов к работе и может выполнять задачи, требующие экспертизы Брента!"})
                 state.mentor_log.append({"sender": "Эрик", "text": f"Отлично! {trainee_name} готов. Теперь у вас есть еще один человек, который может справляться с критическими задачами. Так расширяется пропускная способность ограничения."})
 
+                # Update Bus Factor (Level 4 feature)
+                self._update_bus_factor_after_training()
+
                 state.training_in_progress = None
             else:
                 state.chat_history.append({"sender": "System", "text": f"Обучение продолжается. Осталось {state.training_in_progress['weeks_remaining']} нед."})
@@ -579,5 +606,67 @@ class SimulationEngine:
 
         state.chat_history.append({"sender": "System", "text": f"Sprint {completed_sprint_id} завершен. Готовы к новому циклу!"})
         state.mentor_log.append({"sender": "Эрик", "text": "Ретроспектива завершена. Что вы улучшите в следующем спринте?"})
+
+    # --- Bus Factor System (Level 4) ---
+
+    def _calculate_bus_factor(self):
+        """Рассчитать Bus Factor на основе распределения знаний."""
+        state = self.active_game_state
+        if not state:
+            return 1
+
+        # Bus Factor = минимальное количество людей,
+        # уход которых приведёт к остановке критических задач
+
+        # Knowledge areas based on task types and special requirements
+        knowledge_areas = {
+            'brent_tasks': [],      # Задачи, требующие Брента
+            'business_tasks': [],   # Бизнес-задачи
+            'internal_tasks': [],   # Внутренние задачи
+        }
+
+        # Track which resources can handle each knowledge area
+        for resource in state.resources:
+            res_id = resource['id']
+
+            # Brent tasks: only Brent and trained developers
+            if resource.get('can_handle_brent_tasks', False) or res_id == 'brent':
+                knowledge_areas['brent_tasks'].append(res_id)
+
+            # All resources can handle business and internal tasks
+            # (assuming they're developers)
+            if resource['role'] in ['Developer', 'Lead Engineer']:
+                knowledge_areas['business_tasks'].append(res_id)
+                knowledge_areas['internal_tasks'].append(res_id)
+
+        # Update knowledge distribution in state
+        state.knowledge_distribution = knowledge_areas
+
+        # Calculate bus factor:
+        # The smallest number of people who cover ALL critical knowledge areas
+        # If only 1 person knows critical stuff -> bus_factor = 1 (BAD)
+        # If 3+ people know critical stuff -> higher bus_factor (GOOD)
+
+        # For Brent tasks (most critical) - count how many can handle
+        brent_capable = len(knowledge_areas['brent_tasks'])
+        state.bus_factor = brent_capable
+
+        return state.bus_factor
+
+    def _update_bus_factor_after_training(self):
+        """Обновить Bus Factor после завершения обучения."""
+        state = self.active_game_state
+        old_bus_factor = state.bus_factor
+        new_bus_factor = self._calculate_bus_factor()
+
+        if new_bus_factor > old_bus_factor:
+            state.chat_history.append({
+                "sender": "System",
+                "text": f"🎯 Bus Factor обновлён: {old_bus_factor} → {new_bus_factor}"
+            })
+            state.mentor_log.append({
+                "sender": "Эрик",
+                "text": f"Отлично! Ваш Bus Factor вырос до {new_bus_factor}. Теперь проект не встанет, если уйдёт один человек."
+            })
 
 engine = SimulationEngine()
