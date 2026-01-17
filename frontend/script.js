@@ -32,6 +32,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const tabContents = document.querySelectorAll('.tab-content');
     // Velocity
     const velocityChart = document.getElementById('velocity-chart');
+    // VSM
+    const vsmLeadTime = document.getElementById('vsm-lead-time');
+    const vsmProcessTime = document.getElementById('vsm-process-time');
+    const vsmWaitTime = document.getElementById('vsm-wait-time');
+    const vsmEfficiency = document.getElementById('vsm-efficiency');
+    const vsmStream = document.getElementById('vsm-stream');
     // Modals
     const planningModal = document.getElementById('planning-modal');
     const planningClose = document.getElementById('planning-close');
@@ -151,6 +157,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 6. Velocity Chart
         renderVelocity(state.velocity_history || []);
+
+        // 7. VSM Metrics
+        fetchVSMData();
     }
 
     // --- Sprint Rendering ---
@@ -246,6 +255,64 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="velocity-bar actual" style="height: ${actualHeight}px" title="Actual: ${v.actual}"></div>
                     </div>
                     <span class="velocity-label">S${v.sprint_id}</span>
+                </div>
+            `;
+        }).join('');
+    }
+
+    async function fetchVSMData() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/vsm_metrics`);
+            const vsmData = await response.json();
+            renderVSM(vsmData);
+        } catch (error) {
+            console.error("Failed to fetch VSM data:", error);
+        }
+    }
+
+    function renderVSM(vsmData) {
+        // Update metrics
+        vsmLeadTime.textContent = vsmData.avg_lead_time || '-';
+        vsmProcessTime.textContent = vsmData.avg_process_time || '-';
+        vsmWaitTime.textContent = vsmData.avg_wait_time || '-';
+        vsmEfficiency.textContent = vsmData.flow_efficiency || '-';
+
+        // Color code efficiency
+        if (vsmData.flow_efficiency > 0) {
+            if (vsmData.flow_efficiency >= 50) {
+                vsmEfficiency.style.color = '#22c55e'; // Green
+            } else if (vsmData.flow_efficiency >= 20) {
+                vsmEfficiency.style.color = '#f59e0b'; // Orange
+            } else {
+                vsmEfficiency.style.color = '#ef4444'; // Red
+            }
+        }
+
+        // Render stream visualization
+        renderVSMStream(vsmData);
+    }
+
+    function renderVSMStream(vsmData) {
+        if (!vsmData.completed_tasks || vsmData.completed_tasks.length === 0) {
+            vsmStream.innerHTML = '<div class="vsm-empty">Complete tasks to see value stream</div>';
+            return;
+        }
+
+        const tasks = vsmData.completed_tasks.slice(-10); // Show last 10
+        const maxTime = Math.max(...tasks.map(t => t.lead_time_minutes));
+
+        vsmStream.innerHTML = tasks.map(task => {
+            const waitPct = maxTime > 0 ? (task.wait_time_minutes / maxTime) * 100 : 0;
+            const processPct = maxTime > 0 ? (task.process_time_minutes / maxTime) * 100 : 0;
+
+            return `
+                <div class="vsm-task-row">
+                    <span class="vsm-task-title">${task.title}</span>
+                    <div class="vsm-task-bar">
+                        <div class="vsm-bar-segment vsm-bar-wait" style="width: ${waitPct}%"></div>
+                        <div class="vsm-bar-segment vsm-bar-process" style="width: ${processPct}%"></div>
+                    </div>
+                    <span class="vsm-task-time">${Math.round(task.lead_time_minutes)}min (${Math.round(task.flow_efficiency)}%)</span>
                 </div>
             `;
         }).join('');

@@ -851,3 +851,118 @@ body {
     outline: none;
     border-color: var(--accent-primary);
 }
+
+/* --- VSM (VALUE STREAM MAP) SECTION --- */
+.vsm-section {
+    margin-top: 20px;
+    padding: 16px;
+    background: var(--bg-panel);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.vsm-section h3 {
+    font-size: 12px;
+    color: var(--text-secondary);
+    letter-spacing: 0.1em;
+    margin-bottom: 12px;
+}
+
+.vsm-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.vsm-metric-card {
+    background: var(--bg-dark);
+    padding: 12px;
+    border-radius: 6px;
+    text-align: center;
+    border: 1px solid var(--border-color);
+}
+
+.vsm-label {
+    display: block;
+    font-size: 10px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+}
+
+.vsm-value {
+    display: block;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.vsm-unit {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.vsm-stream {
+    min-height: 100px;
+    background: var(--bg-dark);
+    border-radius: 6px;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.vsm-empty {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 13px;
+    padding: 30px;
+}
+
+.vsm-task-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+    padding: 8px;
+    background: var(--bg-card);
+    border-radius: 4px;
+}
+
+.vsm-task-title {
+    flex: 1;
+    font-size: 12px;
+    color: var(--text-primary);
+}
+
+.vsm-task-bar {
+    display: flex;
+    height: 16px;
+    border-radius: 3px;
+    overflow: hidden;
+    width: 200px;
+}
+
+.vsm-bar-segment {
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.vsm-bar-wait {
+    background: var(--accent-warning);
+}
+
+.vsm-bar-process {
+    background: var(--accent-success);
+}
+
+.vsm-bar-review {
+    background: var(--accent-primary);
+}
+
+.vsm-task-time {
+    margin-left: 10px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    min-width: 80px;
+    text-align: right;
+}

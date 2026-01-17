@@ -51,6 +51,15 @@ def handle_action():
     new_state = engine.process_action(action_data)
     return jsonify(new_state)
 
+@app.route('/api/vsm_metrics')
+def get_vsm_metrics():
+    """Возвращает VSM (Value Stream Map) метрики."""
+    metrics = engine._calculate_vsm_metrics()
+    # Include completed tasks for stream visualization
+    if engine.active_game_state:
+        metrics["completed_tasks"] = engine.active_game_state.vsm_data.get("completed_tasks", [])
+    return jsonify(metrics)
+
 
 # --- Маршрут для обслуживания фронтенда ---
 

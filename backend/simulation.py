@@ -96,6 +96,13 @@ class GameState:
         self.velocity_history = []  # Track velocity across sprints
         self.sprint_counter = 1
 
+        # VSM (Value Stream Map) tracking
+        self.vsm_data = {
+            "completed_tasks": [],  # History of completed tasks with timestamps
+            "current_cycle_times": []  # Current cycle time measurements
+        }
+        self.game_start_time = datetime.now()
+
     def to_dict(self):
         data = self.__dict__.copy()
         if self.current_sprint:
@@ -213,6 +220,105 @@ class SimulationEngine:
         self._check_level_transition()
         return self.active_game_state.to_dict()
 
+    def _create_task(self, task_id, title, task_type, points, duration, required_resource, description):
+        """Create a task with VSM tracking timestamps."""
+        now = datetime.now()
+        return {
+            "id": task_id,
+            "title": title,
+            "type": task_type,
+            "points": points,
+            "duration": duration,
+            "required_resource": required_resource,
+            "assigned_resource": None,
+            "description": description,
+            # VSM timestamps
+            "created_at": now.isoformat(),
+            "backlog_entered": now.isoformat(),
+            "started_at": None,
+            "review_entered": None,
+            "completed_at": None,
+            "column_history": [("backlog", now.isoformat())]
+        }
+
+    def _update_task_timestamp(self, task, column):
+        """Update VSM timestamps when task moves to a column."""
+        now = datetime.now().isoformat()
+        task["column_history"].append((column, now))
+
+        if column == "in_progress" and not task.get("started_at"):
+            task["started_at"] = now
+        elif column == "review" and not task.get("review_entered"):
+            task["review_entered"] = now
+        elif column == "done" and not task.get("completed_at"):
+            task["completed_at"] = now
+
+    def _calculate_vsm_metrics(self):
+        """Calculate VSM metrics from completed tasks."""
+        state = self.active_game_state
+        completed = state.vsm_data.get("completed_tasks", [])
+
+        if not completed:
+            return {
+                "avg_lead_time": 0,
+                "avg_process_time": 0,
+                "avg_wait_time": 0,
+                "flow_efficiency": 0,
+                "total_completed": 0
+            }
+
+        total_lead = sum(t.get("lead_time_minutes", 0) for t in completed)
+        total_process = sum(t.get("process_time_minutes", 0) for t in completed)
+
+        avg_lead = total_lead / len(completed)
+        avg_process = total_process / len(completed)
+        avg_wait = avg_lead - avg_process
+        flow_efficiency = (avg_process / avg_lead * 100) if avg_lead > 0 else 0
+
+        return {
+            "avg_lead_time": round(avg_lead, 1),
+            "avg_process_time": round(avg_process, 1),
+            "avg_wait_time": round(avg_wait, 1),
+            "flow_efficiency": round(flow_efficiency, 1),
+            "total_completed": len(completed)
+        }
+
+    def _record_completed_task_vsm(self, task):
+        """Record VSM data for a completed task."""
+        state = self.active_game_state
+
+        # Calculate times (in "game minutes" - simplified as 1 duration = 60 minutes)
+        created = datetime.fromisoformat(task.get("created_at", task.get("backlog_entered")))
+        completed = datetime.fromisoformat(task.get("completed_at", datetime.now().isoformat()))
+
+        real_lead_time = (completed - created).total_seconds() / 60  # minutes
+
+        # Process time: based on task duration (active work time)
+        process_time = task.get("duration", 1) * 60  # duration in minutes
+
+        # For game balance: if real time is too short (task completed quickly),
+        # add simulated wait time to make the VSM meaningful
+        # Tasks waiting in columns accumulate wait time
+        min_lead_time = process_time * 1.5  # At least 50% wait time
+        lead_time = max(real_lead_time, min_lead_time)
+
+        wait_time = lead_time - process_time
+        flow_efficiency = (process_time / lead_time * 100) if lead_time > 0 else 0
+
+        vsm_record = {
+            "task_id": task.get("id"),
+            "title": task.get("title"),
+            "type": task.get("type"),
+            "points": task.get("points", 0),
+            "lead_time_minutes": round(lead_time, 1),
+            "process_time_minutes": round(process_time, 1),
+            "wait_time_minutes": round(wait_time, 1),
+            "flow_efficiency": round(flow_efficiency, 1),
+            "column_history": task.get("column_history", [])
+        }
+
+        state.vsm_data["completed_tasks"].append(vsm_record)
+
     def _initialize_level_1(self):
         state = self.active_game_state
         state.level = 1
@@ -225,12 +331,12 @@ class SimulationEngine:
         state.tasks["done"] = []
 
         chaos_tasks = [
-            {"id": "task-pay-1", "title": "CRITICAL: Payroll Failure", "type": WorkType.UNPLANNED, "points": 8, "duration": 4, "required_resource": "brent", "assigned_resource": None, "description": "Зарплаты не ушли. CFO угрожает увольнением."},
-            {"id": "task-web-1", "title": "CRITICAL: Site Down 500 Error", "type": WorkType.UNPLANNED, "points": 5, "duration": 2, "required_resource": "brent", "assigned_resource": None, "description": "Главная страница не грузится. Маркетинг теряет лиды."},
-            {"id": "task-sec-1", "title": "Audit: PII Leak Vulnerability", "type": WorkType.UNPLANNED, "points": 3, "duration": 2, "required_resource": "brent", "assigned_resource": None, "description": "CISO нашел дыру в безопасности данных клиентов."}
+            self._create_task("task-pay-1", "CRITICAL: Payroll Failure", WorkType.UNPLANNED, 8, 4, "brent", "Зарплаты не ушли. CFO угрожает увольнением."),
+            self._create_task("task-web-1", "CRITICAL: Site Down 500 Error", WorkType.UNPLANNED, 5, 2, "brent", "Главная страница не грузится. Маркетинг теряет лиды."),
+            self._create_task("task-sec-1", "Audit: PII Leak Vulnerability", WorkType.UNPLANNED, 3, 2, "brent", "CISO нашел дыру в безопасности данных клиентов.")
         ]
 
-        phoenix_task = {"id": "task-phx-1", "title": "Project Phoenix: MVP Scope", "type": WorkType.BUSINESS, "points": 13, "duration": 10, "required_resource": None, "assigned_resource": None, "description": "Будущее компании. Но у нас нет времени на это."}
+        phoenix_task = self._create_task("task-phx-1", "Project Phoenix: MVP Scope", WorkType.BUSINESS, 13, 10, None, "Будущее компании. Но у нас нет времени на это.")
 
         state.tasks["in_progress"] = chaos_tasks
         state.tasks["backlog"] = [phoenix_task]
@@ -250,9 +356,9 @@ class SimulationEngine:
         # We will add a mix of tasks to simulate flow.
 
         new_tasks = [
-            {"id": "task-feat-2", "title": "Cart: One-Click Buy", "type": WorkType.BUSINESS, "points": 5, "duration": 3, "required_resource": None, "assigned_resource": None, "description": "Feature request from Marketing."},
-            {"id": "task-int-1", "title": "DB Migration Script", "type": WorkType.INTERNAL, "points": 3, "duration": 2, "required_resource": "brent", "assigned_resource": None, "description": "Technical debt cleanup."},
-            {"id": "task-chg-1", "title": "Update Tax Rate", "type": WorkType.CHANGES, "points": 1, "duration": 1, "required_resource": None, "assigned_resource": None, "description": "Small config change."}
+            self._create_task("task-feat-2", "Cart: One-Click Buy", WorkType.BUSINESS, 5, 3, None, "Feature request from Marketing."),
+            self._create_task("task-int-1", "DB Migration Script", WorkType.INTERNAL, 3, 2, "brent", "Technical debt cleanup."),
+            self._create_task("task-chg-1", "Update Tax Rate", WorkType.CHANGES, 1, 1, None, "Small config change.")
         ]
 
         state.tasks["backlog"].extend(new_tasks)
@@ -334,10 +440,14 @@ class SimulationEngine:
                 break
 
         if task_to_move:
-            destination_list = state.tasks.get(action.get('new_column_id'))
+            new_column = action.get('new_column_id')
+            destination_list = state.tasks.get(new_column)
             destination_list.append(task_to_move)
 
-            if action.get('new_column_id') == 'done':
+            # VSM: Update timestamps
+            self._update_task_timestamp(task_to_move, new_column)
+
+            if new_column == 'done':
                 if task_to_move.get('assigned_resource'):
                     res_id = task_to_move['assigned_resource']
                     res = next((r for r in state.resources if r['id'] == res_id), None)
@@ -345,6 +455,9 @@ class SimulationEngine:
                         res['busy_task_id'] = None
                         task_to_move['assigned_resource'] = None
                         state.chat_history.append({"sender": "System", "text": f"{res['name']} освободился!"})
+
+                # VSM: Record completed task metrics
+                self._record_completed_task_vsm(task_to_move)
 
     def _handle_set_wip_limit(self, action):
         limit = action.get('limit')
