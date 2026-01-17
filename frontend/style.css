@@ -236,6 +236,7 @@ body {
 .task-card.type-unplanned { border-left-color: var(--card-unplanned); }
 .task-card.type-automation { border-left-color: var(--card-automation); }
 .task-card.type-knowledge { border-left-color: var(--card-knowledge); }
+.task-card.type-knowledge_sharing { border-left-color: #8b5cf6; background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%); }
 .task-card.type-optimization { border-left-color: var(--card-optimization); }
 .task-card.type-experiment { border-left-color: var(--card-experiment); }
 

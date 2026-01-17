@@ -21,6 +21,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const metricUnplannedBar = document.getElementById('metric-unplanned-bar');
     const metricUnplannedText = document.getElementById('metric-unplanned-text');
     const metricWeek = document.getElementById('metric-week');
+    const metricKnowledgeBar = document.getElementById('metric-knowledge-bar');
+    const metricKnowledgeText = document.getElementById('metric-knowledge-text');
+    const metricBusFactor = document.getElementById('metric-bus-factor');
     // Board
     const wipCurrent = document.getElementById('wip-current');
     const wipLimit = document.getElementById('wip-limit');
@@ -136,6 +139,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (unplannedPct > 50) metricUnplannedBar.style.backgroundColor = '#ef4444'; // Red
         else if (unplannedPct > 20) metricUnplannedBar.style.backgroundColor = '#f59e0b'; // Orange
         else metricUnplannedBar.style.backgroundColor = '#22c55e'; // Green
+
+        // Knowledge Bar (Level 4+ feature)
+        const knowledgePct = state.knowledge || 0;
+        metricKnowledgeBar.style.width = `${knowledgePct}%`;
+        metricKnowledgeText.textContent = `${knowledgePct}%`;
+        // Knowledge bar uses purple/blue gradient theme
+        if (knowledgePct < 25) metricKnowledgeBar.style.backgroundColor = '#8b5cf6'; // Purple
+        else if (knowledgePct < 50) metricKnowledgeBar.style.backgroundColor = '#6366f1'; // Indigo
+        else if (knowledgePct < 75) metricKnowledgeBar.style.backgroundColor = '#3b82f6'; // Blue
+        else metricKnowledgeBar.style.backgroundColor = '#06b6d4'; // Cyan
+
+        // Bus Factor
+        metricBusFactor.textContent = state.bus_factor || 1;
+        // Color code bus factor: red for 1, yellow for 2-3, green for 4+
+        const bf = state.bus_factor || 1;
+        if (bf === 1) metricBusFactor.style.color = '#ef4444';
+        else if (bf <= 3) metricBusFactor.style.color = '#f59e0b';
+        else metricBusFactor.style.color = '#22c55e';
 
         // 2. Sprint UI
         renderSprint(state);

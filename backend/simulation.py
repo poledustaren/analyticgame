@@ -19,6 +19,7 @@ class WorkType:
     INTERNAL = "internal"
     CHANGES = "changes"
     UNPLANNED = "unplanned"
+    KNOWLEDGE_SHARING = "knowledge_sharing"
 
 class Sprint:
     """Модель спринта с фазами и целями."""
@@ -70,6 +71,8 @@ class GameState:
         self.unplanned_work = 80
         self.phoenix_progress = 0
         self.wip_limit = 99
+        self.knowledge = 0  # Knowledge sharing score (0-100)
+        self.bus_factor = 1  # Number of people who know critical systems
 
         # Logs
         self.chat_history = [{"sender": "System", "text": "Добро пожаловать в симулятор 'Проект Феникс'!"}]
@@ -221,6 +224,8 @@ class SimulationEngine:
         elif action_type == 'set_wip_limit': self._handle_set_wip_limit(action)
         elif action_type == 'minigame_result': self._handle_minigame_result(action)
         elif action_type == 'assign_resource': self._handle_assign_resource(action)
+        # Knowledge Sharing actions
+        elif action_type == 'knowledge_share': self._handle_knowledge_share(action)
         # Sprint actions
         elif action_type == 'sprint_create': self._handle_sprint_create(action)
         elif action_type == 'sprint_start': self._handle_sprint_start(action)
@@ -291,6 +296,73 @@ class SimulationEngine:
         state.chat_history.append({"sender": "System", "text": "--- УРОВЕНЬ 2: УВИДЕТЬ ПОТОК ---"})
         state.mentor_log.append({"sender": "Эрик", "text": "Поздравляю, ты потушил пожары. Теперь ты должен научиться видеть поток. Мы вводим WIP-лимиты. Не бери в работу больше 3 задач одновременно!"})
 
+    def _initialize_level_3(self):
+        state = self.active_game_state
+        old_level = state.level
+        state.level = 3
+        state.wip_limit = 4
+
+        # Set level_up notification for frontend
+        state.level_up = {
+            'from': old_level,
+            'to': 3,
+            'message': 'LEVEL UP! Петли обратной связи.',
+            'stats': {
+                'title': 'The Feedback Loop',
+                'objective': 'Внедрить CAB и повысить качество кода.'
+            }
+        }
+
+        new_tasks = [
+            {"id": "task-cicd-1", "title": "Setup CI Pipeline", "type": WorkType.INTERNAL, "points": 8, "duration": 4, "required_resource": "brent", "assigned_resource": None, "description": "Автоматизируем сборку и тесты."},
+            {"id": "task-cab-1", "title": "CAB Meeting: Code Review Process", "type": WorkType.CHANGES, "points": 3, "duration": 2, "required_resource": None, "assigned_resource": None, "description": "Утвердить процесс ревью кода."},
+            {"id": "task-feat-3", "title": "User Authentication API", "type": WorkType.BUSINESS, "points": 8, "duration": 5, "required_resource": None, "assigned_resource": None, "description": "API для аутентификации пользователей."}
+        ]
+
+        state.tasks["backlog"].extend(new_tasks)
+
+        state.chat_history.append({"sender": "System", "text": "--- УРОВЕНЬ 3: ПЕТЛИ ОБРАТНОЙ СВЯЗИ ---"})
+        state.mentor_log.append({"sender": "Эрик", "text": "Второй путь: создавай петли обратной связи справа налево. Чем раньше найдешь ошибку, тем дешевле её исправить."})
+
+    def _initialize_level_4(self):
+        state = self.active_game_state
+        old_level = state.level
+        state.level = 4
+        state.wip_limit = 5
+
+        # Set level_up notification for frontend
+        state.level_up = {
+            'from': old_level,
+            'to': 4,
+            'message': 'LEVEL UP! Культура улучшений и Knowledge Sharing.',
+            'stats': {
+                'title': 'The Culture of Learning',
+                'objective': 'Нарасти Knowledge Score для снижения Bus Factor риска.'
+            }
+        }
+
+        # Knowledge Sharing tasks for Level 4
+        knowledge_tasks = [
+            {"id": "task-kn-1", "title": "Documentation: Payroll System", "type": WorkType.KNOWLEDGE_SHARING, "points": 3, "duration": 2, "required_resource": "brent", "assigned_resource": None, "knowledge_gain": 10, "description": "Брент документирует систему зарплаты."},
+            {"id": "task-kn-2", "title": "Mentoring: Database Operations", "type": WorkType.KNOWLEDGE_SHARING, "points": 5, "duration": 3, "required_resource": "brent", "assigned_resource": None, "knowledge_gain": 15, "description": "Брент менторит команду по работе с БД."},
+            {"id": "task-kn-3", "title": "Pair Programming: API Architecture", "type": WorkType.KNOWLEDGE_SHARING, "points": 5, "duration": 3, "required_resource": "brent", "assigned_resource": None, "knowledge_gain": 20, "description": "Совместная разработка с командой."},
+            {"id": "task-kn-4", "title": "Documentation: Deployment Process", "type": WorkType.KNOWLEDGE_SHARING, "points": 3, "duration": 2, "required_resource": "brent", "assigned_resource": None, "knowledge_gain": 10, "description": "Документация процесса деплоя."},
+            {"id": "task-kn-5", "title": "Knowledge Base Setup", "type": WorkType.KNOWLEDGE_SHARING, "points": 5, "duration": 3, "required_resource": None, "assigned_resource": None, "knowledge_gain": 15, "description": "Создание базы знаний команды."}
+        ]
+
+        # Business tasks for Level 4
+        business_tasks = [
+            {"id": "task-feat-4", "title": "Real-time Analytics Dashboard", "type": WorkType.BUSINESS, "points": 13, "duration": 6, "required_resource": None, "assigned_resource": None, "description": "Дашборд аналитики в реальном времени."},
+            {"id": "task-auto-1", "title": "CD Pipeline: Auto Deployment", "type": WorkType.INTERNAL, "points": 8, "duration": 4, "required_resource": "brent", "assigned_resource": None, "description": "Автоматический деплой на прод."}
+        ]
+
+        state.tasks["backlog"].extend(knowledge_tasks)
+        state.tasks["backlog"].extend(business_tasks)
+
+        state.chat_history.append({"sender": "System", "text": "--- УРОВЕНЬ 4: КУЛЬТУРА УЛУЧШЕНИЙ ---"})
+        state.mentor_log.append({"sender": "Эрик", "text": "Третий путь: культура постоянного экспериментирования и обучения. Твой Bus Factor сейчас равен 1 - если Брент заболеет, всё остановится. Выполняй задачи Knowledge Sharing, чтобы распределить знания!"})
+        state.chat_history.append({"sender": "System", "text": "Новая механика: Knowledge Sharing! Выполняющие эти задачи увеличат Knowledge Score и повысят Bus Factor."})
+
     def _check_level_transition(self):
         state = self.active_game_state
 
@@ -302,6 +374,21 @@ class SimulationEngine:
             # (Assuming player didn't delete them, which isn't possible yet)
             if unplanned_done >= 3:
                  self._initialize_level_2()
+
+        # Level 2 -> Level 3 Transition
+        # Condition: Complete at least 2 business tasks and maintain stability
+        elif state.level == 2:
+            business_done = len([t for t in state.tasks['done'] if t['type'] == WorkType.BUSINESS])
+            if business_done >= 2:
+                self._initialize_level_3()
+
+        # Level 3 -> Level 4 Transition
+        # Condition: Complete at least 1 internal task and 1 business task in level 3
+        elif state.level == 3:
+            # Count tasks done in level 3 (simplified check)
+            total_done = len(state.tasks['done'])
+            if total_done >= 5:  # After completing 5 tasks total
+                self._initialize_level_4()
 
     # --- Action Handlers ---
 
@@ -377,12 +464,90 @@ class SimulationEngine:
                         task_to_move['assigned_resource'] = None
                         state.chat_history.append({"sender": "System", "text": f"{res['name']} освободился!"})
 
+                # Knowledge Sharing mechanic: completing knowledge_sharing tasks increases knowledge
+                if task_to_move.get('type') == WorkType.KNOWLEDGE_SHARING:
+                    knowledge_gain = task_to_move.get('knowledge_gain', 5)
+                    state.knowledge = min(100, state.knowledge + knowledge_gain)
+
+                    # Update bus_factor based on knowledge milestones
+                    old_bus_factor = state.bus_factor
+                    if state.knowledge >= 25 and state.bus_factor < 2:
+                        state.bus_factor = 2
+                    elif state.knowledge >= 50 and state.bus_factor < 3:
+                        state.bus_factor = 3
+                    elif state.knowledge >= 75 and state.bus_factor < 4:
+                        state.bus_factor = 4
+                    elif state.knowledge >= 100 and state.bus_factor < 5:
+                        state.bus_factor = 5
+
+                    if old_bus_factor != state.bus_factor:
+                        state.mentor_log.append({"sender": "Эрик", "text": f"Bus Factor увеличился до {state.bus_factor}! Команда становится более устойчивой."})
+                        self._ensure_developers_for_bus_factor()
+
+                    state.chat_history.append({"sender": "System", "text": f"Knowledge Sharing завершен! Knowledge +{knowledge_gain} (текущий: {state.knowledge}%)"})
+
     def _handle_set_wip_limit(self, action):
         limit = action.get('limit')
         if isinstance(limit, int) and limit > 0: self.active_game_state.wip_limit = limit
 
     def _handle_minigame_result(self, action):
         pass
+
+    def _handle_knowledge_share(self, action):
+        """Обрабатывает действия Knowledge Sharing."""
+        state = self.active_game_state
+        share_type = action.get('share_type', 'documentation')  # documentation, mentoring, pair_programming
+        amount = action.get('amount', 10)
+
+        # Knowledge increases based on type
+        knowledge_gain = amount
+        if share_type == 'documentation':
+            knowledge_gain = 5
+            state.chat_history.append({"sender": "System", "text": "Брент создал документацию. Knowledge +5"})
+        elif share_type == 'mentoring':
+            knowledge_gain = 10
+            state.chat_history.append({"sender": "System", "text": "Брент провел менторскую сессию. Knowledge +10"})
+        elif share_type == 'pair_programming':
+            knowledge_gain = 15
+            state.chat_history.append({"sender": "System", "text": "Pair programming сессия завершена. Knowledge +15"})
+
+        state.knowledge = min(100, state.knowledge + knowledge_gain)
+
+        # Update bus_factor based on knowledge
+        if state.knowledge >= 25 and state.bus_factor < 2:
+            state.bus_factor = 2
+            state.mentor_log.append({"sender": "Эрик", "text": "Отлично! Теперь двое человек знают критические системы. Bus Factor: 2"})
+        elif state.knowledge >= 50 and state.bus_factor < 3:
+            state.bus_factor = 3
+            state.mentor_log.append({"sender": "Эрик", "text": "Прогресс! Трое человек могут покрыть друг друга. Bus Factor: 3"})
+        elif state.knowledge >= 75 and state.bus_factor < 4:
+            state.bus_factor = 4
+            state.mentor_log.append({"sender": "Эрик", "text": "Здорово! Команда становится устойчивой. Bus Factor: 4"})
+        elif state.knowledge >= 100 and state.bus_factor < 5:
+            state.bus_factor = 5
+            state.mentor_log.append({"sender": "Эрик", "text": "Превосходно! Знания распределены по команде. Bus Factor: 5"})
+
+        # Add new developer resource when bus_factor increases
+        self._ensure_developers_for_bus_factor()
+
+    def _ensure_developers_for_bus_factor(self):
+        """Добавляет разработчиков в resources в соответствии с bus_factor."""
+        state = self.active_game_state
+        target_devs = state.bus_factor  # Brent + (bus_factor - 1) other developers
+
+        current_dev_count = len(state.resources)
+
+        while len(state.resources) < target_devs:
+            new_dev_id = f"dev{len(state.resources)}"
+            new_dev = {
+                "id": new_dev_id,
+                "name": f"Разработчик {len(state.resources)}",
+                "role": "Software Engineer",
+                "avatar": f"{new_dev_id}_avatar.png",
+                "busy_task_id": None
+            }
+            state.resources.append(new_dev)
+            state.chat_history.append({"sender": "System", "text": f"{new_dev['name']} присоединился к команде и готов к работе!"})
 
     # --- Sprint Action Handlers ---
 
