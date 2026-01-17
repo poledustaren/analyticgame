@@ -76,6 +76,11 @@
                     <span class="label">WEEK</span>
                     <span class="value" id="metric-week">1</span>
                 </div>
+                <div class="metric-card">
+                    <span class="label">AVG LEAD TIME</span>
+                    <span class="value" id="metric-lead-time">-</span>
+                    <span class="value-sub">min</span>
+                </div>
             </header>
 
             <!-- Sprint Phases Bar (visible when sprint active) -->
@@ -175,6 +180,14 @@
                 </div>
                 <div id="vsm-stream" class="vsm-stream">
                     <div class="vsm-empty">Complete tasks to see value stream</div>
+                </div>
+            </div>
+
+            <!-- Lead Time History Chart -->
+            <div id="leadtime-section" class="leadtime-section">
+                <h3>LEAD TIME HISTORY</h3>
+                <div id="leadtime-chart" class="leadtime-chart">
+                    <div class="leadtime-empty">Complete tasks to see lead time trend</div>
                 </div>
             </div>
         </main>

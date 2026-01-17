@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const metricUnplannedBar = document.getElementById('metric-unplanned-bar');
     const metricUnplannedText = document.getElementById('metric-unplanned-text');
     const metricWeek = document.getElementById('metric-week');
+    const metricLeadTime = document.getElementById('metric-lead-time');
     // Board
     const wipCurrent = document.getElementById('wip-current');
     const wipLimit = document.getElementById('wip-limit');
@@ -38,6 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const vsmWaitTime = document.getElementById('vsm-wait-time');
     const vsmEfficiency = document.getElementById('vsm-efficiency');
     const vsmStream = document.getElementById('vsm-stream');
+    const leadtimeChart = document.getElementById('leadtime-chart');
     // Modals
     const planningModal = document.getElementById('planning-modal');
     const planningClose = document.getElementById('planning-close');
@@ -271,7 +273,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderVSM(vsmData) {
-        // Update metrics
+        // Update main metrics
+        if (vsmData.avg_lead_time && vsmData.avg_lead_time > 0) {
+            metricLeadTime.textContent = Math.round(vsmData.avg_lead_time);
+            // Color code lead time
+            if (vsmData.avg_lead_time <= 240) {
+                metricLeadTime.style.color = '#22c55e'; // Green: <= 4 hours
+            } else if (vsmData.avg_lead_time <= 480) {
+                metricLeadTime.style.color = '#f59e0b'; // Orange: <= 8 hours
+            } else {
+                metricLeadTime.style.color = '#ef4444'; // Red: > 8 hours
+            }
+        }
+
+        // Update VSM section metrics
         vsmLeadTime.textContent = vsmData.avg_lead_time || '-';
         vsmProcessTime.textContent = vsmData.avg_process_time || '-';
         vsmWaitTime.textContent = vsmData.avg_wait_time || '-';
@@ -290,6 +305,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Render stream visualization
         renderVSMStream(vsmData);
+
+        // Render lead time history chart
+        renderLeadTimeChart(vsmData);
+    }
+
+    function renderLeadTimeChart(vsmData) {
+        if (!vsmData.completed_tasks || vsmData.completed_tasks.length === 0) {
+            leadtimeChart.innerHTML = '<div class="leadtime-empty">Complete tasks to see lead time trend</div>';
+            return;
+        }
+
+        const tasks = vsmData.completed_tasks.slice(-20); // Show last 20
+        const maxLeadTime = Math.max(...tasks.map(t => t.lead_time_minutes));
+
+        leadtimeChart.innerHTML = tasks.map(task => {
+            const height = maxLeadTime > 0 ? (task.lead_time_minutes / maxLeadTime) * 60 : 0;
+            const speedClass = task.lead_time_minutes <= 240 ? 'fast' :
+                              task.lead_time_minutes <= 480 ? 'medium' : 'slow';
+
+            // Shorten task title for label
+            const shortTitle = task.title.length > 15 ? task.title.substring(0, 12) + '...' : task.title;
+
+            return `
+                <div class="leadtime-bar-group">
+                    <div class="leadtime-bar ${speedClass}" style="height: ${height}px" title="${task.title}: ${Math.round(task.lead_time_minutes)}min"></div>
+                    <span class="leadtime-label" title="${task.title}">${shortTitle}</span>
+                </div>
+            `;
+        }).join('');
     }
 
     function renderVSMStream(vsmData) {
