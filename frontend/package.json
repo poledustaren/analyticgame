@@ -1,0 +1,15 @@
+{
+  "name": "phoenix-simulator",
+  "version": "1.0.0",
+  "description": "The Phoenix Project - Simulator Game",
+  "type": "module",
+  "scripts": {
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0",
+    "vitest": "^1.0.0"
+  }
+}
