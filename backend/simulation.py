@@ -4,8 +4,518 @@ import os
 import glob
 from datetime import datetime, timedelta
 from enum import Enum
+import requests
+from typing import List, Dict, Callable, Optional
 
 SAVES_DIR = os.path.join(os.path.dirname(__file__), 'saves')
+
+# --- Event System ---
+
+class EventSeverity(Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+class EventType(Enum):
+    TECHNICAL = "technical"      # Bugs, outages, technical debt
+    BUSINESS = "business"        # Requirement changes, stakeholder requests
+    TEAM = "team"                # Resource issues, conflicts, morale
+    EXTERNAL = "external"        # Vendor problems, regulatory changes
+    RANDOM = "random"            # Pure chance events
+
+class Event:
+    """Represents a procedural event with choices and consequences."""
+    def __init__(self, event_id: str, title: str, description: str,
+                 event_type: EventType, severity: EventSeverity,
+                 choices: List[Dict], trigger_conditions: Optional[Dict] = None):
+        self.id = event_id
+        self.title = title
+        self.description = description
+        self.type = event_type
+        self.severity = severity
+        self.choices = choices  # List of {"id": str, "text": str, "consequences": Dict}
+        self.trigger_conditions = trigger_conditions or {}
+        self.timestamp = datetime.now()
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "title": self.title,
+            "description": self.description,
+            "type": self.type.value,
+            "severity": self.severity.value,
+            "choices": self.choices,
+            "timestamp": self.timestamp.isoformat()
+        }
+
+class EventLibrary:
+    """Library of event templates for procedural generation."""
+
+    TECHNICAL_EVENTS = [
+        {
+            "id": "tech-bug-prod",
+            "title": "🐛 Production Bug Detected",
+            "description": "Critical bug found in production. Customers are reporting issues.",
+            "type": EventType.TECHNICAL,
+            "severity": EventSeverity.HIGH,
+            "trigger": {"unplanned_work": 0, "level": [1, 2, 3]},
+            "choices": [
+                {
+                    "id": "hotfix",
+                    "text": "🔥 Deploy hotfix immediately (risky)",
+                    "consequences": {"budget": -5000, "stability": -10, "unplanned_work": 15}
+                },
+                {
+                    "id": "investigate",
+                    "text": "🔍 Investigate first (safer but slower)",
+                    "consequences": {"budget": -2000, "stability": -5, "unplanned_work": 10}
+                },
+                {
+                    "id": "ignore",
+                    "text": "⏳ Wait for next release",
+                    "consequences": {"stability": -20, "morale": -15}
+                }
+            ]
+        },
+        {
+            "id": "tech-debt",
+            "title": "🏗️ Technical Debt Accumulating",
+            "description": "Code review shows increasing technical debt in core modules.",
+            "type": EventType.TECHNICAL,
+            "severity": EventSeverity.MEDIUM,
+            "trigger": {"level": [2, 3, 4]},
+            "choices": [
+                {
+                    "id": "refactor-now",
+                    "text": "Refactor now (delay features)",
+                    "consequences": {"budget": -8000, "unplanned_work": -10, "stability": 15}
+                },
+                {
+                    "id": "refactor-later",
+                    "text": "Schedule for next sprint",
+                    "consequences": {"unplanned_work": 5, "stability": -5}
+                }
+            ]
+        },
+        {
+            "id": "tech-server-down",
+            "title": "🔴 Server Outage",
+            "description": "Main application server is down. Revenue is being lost every minute!",
+            "type": EventType.TECHNICAL,
+            "severity": EventSeverity.CRITICAL,
+            "trigger": {"random_chance": 0.05, "level": [1, 2]},
+            "choices": [
+                {
+                    "id": "restart",
+                    "text": "Quick restart (may lose data)",
+                    "consequences": {"budget": -3000, "stability": -15, "unplanned_work": 20}
+                },
+                {
+                    "id": "backup",
+                    "text": "Restore from backup (slower)",
+                    "consequences": {"budget": -7000, "stability": 5, "unplanned_work": 25}
+                },
+                {
+                    "id": "brent-fix",
+                    "text": "Have Brent investigate",
+                    "consequences": {"budget": -4000, "stability": 5, "unplanned_work": 15}
+                }
+            ]
+        },
+        {
+            "id": "tech-deployment-fail",
+            "title": "⚠️ Deployment Failed",
+            "description": "Last night's deployment failed. Rollback may be needed.",
+            "type": EventType.TECHNICAL,
+            "severity": EventSeverity.MEDIUM,
+            "trigger": {"random_chance": 0.08},
+            "choices": [
+                {
+                    "id": "rollback",
+                    "text": "Rollback immediately",
+                    "consequences": {"budget": -2000, "unplanned_work": 10}
+                },
+                {
+                    "id": "forward-fix",
+                    "text": "Fix and redeploy",
+                    "consequences": {"budget": -5000, "unplanned_work": 15, "stability": -10}
+                }
+            ]
+        }
+    ]
+
+    BUSINESS_EVENTS = [
+        {
+            "id": "biz-req-change",
+            "title": "📝 Requirement Change Request",
+            "description": "Stakeholder wants to change a key feature. It affects current sprint.",
+            "type": EventType.BUSINESS,
+            "severity": EventSeverity.MEDIUM,
+            "trigger": {"level": [1, 2, 3]},
+            "choices": [
+                {
+                    "id": "accept",
+                    "text": "Accept change (reprioritize)",
+                    "consequences": {"budget": -3000, "unplanned_work": 10, "stability": -5}
+                },
+                {
+                    "id": "defer",
+                    "text": "Defer to next sprint",
+                    "consequences": {"stability": 5}
+                },
+                {
+                    "id": "negotiate",
+                    "text": "Negotiate scope reduction",
+                    "consequences": {"budget": -1000, "stability": 5}
+                }
+            ]
+        },
+        {
+            "id": "biz-deadline",
+            "title": "⏰ Deadline Accelerated",
+            "description": "Management wants the project delivered 2 weeks earlier!",
+            "type": EventType.BUSINESS,
+            "severity": EventSeverity.HIGH,
+            "trigger": {"random_chance": 0.06, "level": [1, 2, 3]},
+            "choices": [
+                {
+                    "id": "crunch",
+                    "text": "Work overtime (burn risk)",
+                    "consequences": {"budget": -10000, "morale": -20, "stability": -10}
+                },
+                {
+                    "id": "cut-scope",
+                    "text": "Cut non-essential features",
+                    "consequences": {"stability": -5, "unplanned_work": -5}
+                },
+                {
+                    "id": "push-back",
+                    "text": "Push back on deadline",
+                    "consequences": {"stability": -15}
+                }
+            ]
+        },
+        {
+            "id": "biz-new-feature",
+            "title": "✨ New Feature Request",
+            "description": "Marketing wants a new feature for upcoming campaign.",
+            "type": EventType.BUSINESS,
+            "severity": EventSeverity.LOW,
+            "trigger": {"random_chance": 0.1},
+            "choices": [
+                {
+                    "id": "accept",
+                    "text": "Add to backlog",
+                    "consequences": {"unplanned_work": 5}
+                },
+                {
+                    "id": "decline",
+                    "text": "Decline for now",
+                    "consequences": {"stability": 5}
+                }
+            ]
+        }
+    ]
+
+    TEAM_EVENTS = [
+        {
+            "id": "team-sick-day",
+            "title": "🤒 Team Member Sick",
+            "description": "A key developer is out sick. Velocity will be affected.",
+            "type": EventType.TEAM,
+            "severity": EventSeverity.LOW,
+            "trigger": {"random_chance": 0.08},
+            "choices": [
+                {
+                    "id": "cover",
+                    "text": "Others cover the work",
+                    "consequences": {"morale": -5, "unplanned_work": 5}
+                },
+                {
+                    "id": "delay",
+                    "text": "Delay non-critical tasks",
+                    "consequences": {"stability": -5}
+                }
+            ]
+        },
+        {
+            "id": "team-conflict",
+            "title": "😤 Team Conflict",
+            "description": "Disagreement between team members on technical approach.",
+            "type": EventType.TEAM,
+            "severity": EventSeverity.MEDIUM,
+            "trigger": {"random_chance": 0.05},
+            "choices": [
+                {
+                    "id": "mediate",
+                    "text": "Mediate the discussion",
+                    "consequences": {"stability": 5, "budget": -1000}
+                },
+                {
+                    "id": "decide",
+                    "text": "Make an executive decision",
+                    "consequences": {"morale": -10, "stability": -5}
+                }
+            ]
+        },
+        {
+            "id": "team-low-morale",
+            "title": "😔 Low Team Morale",
+            "description": "Team seems burned out from recent crunch.",
+            "type": EventType.TEAM,
+            "severity": EventSeverity.MEDIUM,
+            "trigger": {"morale_below": 50},
+            "choices": [
+                {
+                    "id": "team-lunch",
+                    "text": "Team building activity",
+                    "consequences": {"budget": -1500, "morale": 15}
+                },
+                {
+                    "id": "time-off",
+                    "text": "Encourage time off",
+                    "consequences": {"unplanned_work": 5, "morale": 10}
+                },
+                {
+                    "id": "push-through",
+                    "text": "Push through (risky)",
+                    "consequences": {"morale": -15, "stability": -10}
+                }
+            ]
+        }
+    ]
+
+    EXTERNAL_EVENTS = [
+        {
+            "id": "ext-vendor-delay",
+            "title": "📦 Vendor Delay",
+            "description": "Key vendor is delayed on delivering critical component.",
+            "type": EventType.EXTERNAL,
+            "severity": EventSeverity.HIGH,
+            "trigger": {"random_chance": 0.06},
+            "choices": [
+                {
+                    "id": "wait",
+                    "text": "Wait for vendor",
+                    "consequences": {"stability": -10, "unplanned_work": 10}
+                },
+                {
+                    "id": "alternative",
+                    "text": "Find alternative (costly)",
+                    "consequences": {"budget": -8000, "stability": 5}
+                },
+                {
+                    "id": "build",
+                    "text": "Build in-house",
+                    "consequences": {"budget": -12000, "unplanned_work": 15}
+                }
+            ]
+        },
+        {
+            "id": "ext-security-audit",
+            "title": "🔒 Security Audit Required",
+            "description": "External compliance requires immediate security audit.",
+            "type": EventType.EXTERNAL,
+            "severity": EventSeverity.HIGH,
+            "trigger": {"random_chance": 0.04, "level": [2, 3, 4]},
+            "choices": [
+                {
+                    "id": "immediate",
+                    "text": "Conduct immediately (disruptive)",
+                    "consequences": {"budget": -5000, "unplanned_work": 20, "stability": 10}
+                },
+                {
+                    "id": "schedule",
+                    "text": "Schedule for next sprint",
+                    "consequences": {"stability": -10}
+                }
+            ]
+        }
+    ]
+
+    LEVEL_SPECIFIC_EVENTS = {
+        1: [  # Chaos phase - more unplanned work
+            {
+                "id": "lvl1-fire",
+                "title": "🔥 Another Fire!",
+                "description": "Something else broke. Can you believe it?",
+                "type": EventType.TECHNICAL,
+                "severity": EventSeverity.HIGH,
+                "trigger": {"unplanned_work_above": 50},
+                "choices": [
+                    {
+                        "id": "brent",
+                        "text": "Brent handles it",
+                        "consequences": {"unplanned_work": 5}
+                    },
+                    {
+                        "id": "team",
+                        "text": "Let team handle",
+                        "consequences": {"unplanned_work": 15, "morale": -10}
+                    }
+                ]
+            }
+        ],
+        2: [  # Flow phase - WIP management
+            {
+                "id": "lvl2-wip-exceeded",
+                "title": "📊 WIP Limit Analysis",
+                "description": "Erik notices you're approaching WIP limit frequently.",
+                "type": EventType.TEAM,
+                "severity": EventSeverity.LOW,
+                "trigger": {"wip_near_limit": True},
+                "choices": [
+                    {
+                        "id": "lower-limit",
+                        "text": "Lower WIP limit further",
+                        "consequences": {"wip_limit": -1, "stability": 5}
+                    },
+                    {
+                        "id": "keep",
+                        "text": "Keep current limit",
+                        "consequences": {}
+                    }
+                ]
+            }
+        ],
+        3: [  # Level 3 - more complex
+            {
+                "id": "lvl3-knowledge-gap",
+                "title": "📚 Knowledge Gap Detected",
+                "description": "Team lacks documentation for critical system.",
+                "type": EventType.TECHNICAL,
+                "severity": EventSeverity.MEDIUM,
+                "trigger": {"random_chance": 0.08},
+                "choices": [
+                    {
+                        "id": "document",
+                        "text": "Sprint documentation",
+                        "consequences": {"budget": -4000, "unplanned_work": 10, "stability": 10}
+                    },
+                    {
+                        "id": "mentor",
+                        "text": "Pair programming sessions",
+                        "consequences": {"budget": -2000, "stability": 5}
+                    }
+                ]
+            }
+        ]
+    }
+
+    @classmethod
+    def get_all_events(cls) -> List[Dict]:
+        """Get all event templates."""
+        all_events = []
+        all_events.extend(cls.TECHNICAL_EVENTS)
+        all_events.extend(cls.BUSINESS_EVENTS)
+        all_events.extend(cls.TEAM_EVENTS)
+        all_events.extend(cls.EXTERNAL_EVENTS)
+        return all_events
+
+    @classmethod
+    def get_events_for_level(cls, level: int) -> List[Dict]:
+        """Get events applicable to specific level."""
+        all_events = cls.get_all_events()
+        level_events = cls.LEVEL_SPECIFIC_EVENTS.get(level, [])
+        all_events.extend(level_events)
+        return all_events
+
+class EventGenerator:
+    """Procedurally generates events based on game state."""
+
+    def __init__(self, event_library: EventLibrary = None):
+        self.library = event_library or EventLibrary()
+        self.triggered_events = set()  # Track events that already triggered this session
+
+    def can_trigger(self, event_template: Dict, state: 'GameState') -> bool:
+        """Check if event conditions are met."""
+        conditions = event_template.get("trigger", {})
+
+        # Check level requirement
+        if "level" in conditions:
+            if state.level not in conditions["level"]:
+                return False
+
+        # Check random chance
+        if "random_chance" in conditions:
+            if random.random() > conditions["random_chance"]:
+                return False
+
+        # Check unplanned work threshold
+        if "unplanned_work_above" in conditions:
+            if state.unplanned_work <= conditions["unplanned_work_above"]:
+                return False
+
+        if "unplanned_work" in conditions:
+            if state.unplanned_work > conditions["unplanned_work"]:
+                return False
+
+        # Check morale threshold
+        if "morale_below" in conditions:
+            if state.morale >= conditions["morale_below"]:
+                return False
+
+        # Check WIP near limit
+        if conditions.get("wip_near_limit"):
+            in_progress = len(state.tasks.get("in_progress", []))
+            if in_progress < state.wip_limit - 1:
+                return False
+
+        # Check if already triggered
+        if event_template["id"] in self.triggered_events:
+            return False
+
+        return True
+
+    def generate_event(self, state: 'GameState') -> Optional[Event]:
+        """Generate a random event based on current state."""
+        available_events = self.library.get_events_for_level(state.level)
+
+        # Filter events that can trigger
+        candidates = []
+        for event_template in available_events:
+            if self.can_trigger(event_template, state):
+                candidates.append(event_template)
+
+        if not candidates:
+            return None
+
+        # Weight by severity (critical events rarer)
+        severity_weights = {
+            EventSeverity.CRITICAL: 1,
+            EventSeverity.HIGH: 2,
+            EventSeverity.MEDIUM: 3,
+            EventSeverity.LOW: 4
+        }
+
+        # Calculate weights for candidates
+        weights = []
+        for candidate in candidates:
+            severity = candidate.get("severity", EventSeverity.MEDIUM)
+            weights.append(severity_weights.get(severity, 3))
+
+        # Select event
+        selected = random.choices(candidates, weights=weights, k=1)[0]
+
+        # Mark as triggered
+        self.triggered_events.add(selected["id"])
+
+        # Create Event object
+        return Event(
+            event_id=selected["id"],
+            title=selected["title"],
+            description=selected["description"],
+            event_type=selected["type"],
+            severity=selected["severity"],
+            choices=selected["choices"]
+        )
+
+    def reset_triggered(self):
+        """Reset triggered events (call on new game)."""
+        self.triggered_events.clear()
+
+# --- Sprint System ---
 
 class SprintPhase(Enum):
     PLANNING = "planning"
@@ -59,6 +569,149 @@ class Sprint:
             "retro_notes": self.retro_notes
         }
 
+class PipelineStage(Enum):
+    """Этапы CI/CD пайплайна."""
+    BUILD = "build"
+    TEST = "test"
+    DEPLOY_STAGING = "deploy_staging"
+    DEPLOY_PROD = "deploy_prod"
+    MONITOR = "monitor"
+
+class PipelineStageStatus(Enum):
+    """Статус этапа пайплайна."""
+    PENDING = "pending"
+    RUNNING = "running"
+    SUCCESS = "success"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+class CICDPipeline:
+    """Модель CI/CD пайплайна для визуализации деплоймента."""
+    def __init__(self, pipeline_id: str, name: str = "Deployment Pipeline"):
+        self.id = pipeline_id
+        self.name = name
+        self.created_at = datetime.now()
+        self.stages = {
+            PipelineStage.BUILD.value: {
+                "status": PipelineStageStatus.PENDING.value,
+                "duration": 0,
+                "last_run": None
+            },
+            PipelineStage.TEST.value: {
+                "status": PipelineStageStatus.PENDING.value,
+                "duration": 0,
+                "last_run": None
+            },
+            PipelineStage.DEPLOY_STAGING.value: {
+                "status": PipelineStageStatus.PENDING.value,
+                "duration": 0,
+                "last_run": None
+            },
+            PipelineStage.DEPLOY_PROD.value: {
+                "status": PipelineStageStatus.PENDING.value,
+                "duration": 0,
+                "last_run": None
+            },
+            PipelineStage.MONITOR.value: {
+                "status": PipelineStageStatus.PENDING.value,
+                "duration": 0,
+                "last_run": None
+            }
+        }
+        self.current_stage = None  # Currently executing stage
+        self.total_runs = 0
+        self.successful_runs = 0
+        self.failed_runs = 0
+        self.is_automated = False  # Becomes true after full implementation
+
+    def start_pipeline(self):
+        """Запускает пайплайн с начала."""
+        self.current_stage = PipelineStage.BUILD.value
+        self.stages[PipelineStage.BUILD.value]["status"] = PipelineStageStatus.RUNNING.value
+        self.stages[PipelineStage.BUILD.value]["last_run"] = datetime.now()
+        self.total_runs += 1
+        return self.to_dict()
+
+    def advance_stage(self):
+        """Продвигает пайплайн на следующий этап."""
+        stage_order = [
+            PipelineStage.BUILD.value,
+            PipelineStage.TEST.value,
+            PipelineStage.DEPLOY_STAGING.value,
+            PipelineStage.DEPLOY_PROD.value,
+            PipelineStage.MONITOR.value
+        ]
+
+        if not self.current_stage:
+            return self.start_pipeline()
+
+        current_idx = stage_order.index(self.current_stage)
+        if current_idx < len(stage_order) - 1:
+            # Mark current stage as success
+            self.stages[self.current_stage]["status"] = PipelineStageStatus.SUCCESS.value
+
+            # Move to next stage
+            next_stage = stage_order[current_idx + 1]
+            self.current_stage = next_stage
+            self.stages[next_stage]["status"] = PipelineStageStatus.RUNNING.value
+            self.stages[next_stage]["last_run"] = datetime.now()
+
+            return self.to_dict()
+
+        # Pipeline complete
+        self.current_stage = None
+        self.stages[PipelineStage.MONITOR.value]["status"] = PipelineStageStatus.SUCCESS.value
+        self.successful_runs += 1
+        return self.to_dict()
+
+    def fail_stage(self, stage: str):
+        """Отмечает этап как неудачный."""
+        if stage in self.stages:
+            self.stages[stage]["status"] = PipelineStageStatus.FAILED.value
+            self.current_stage = None
+            self.failed_runs += 1
+            # Reset all stages after failed one
+            stage_order = [
+                PipelineStage.BUILD.value,
+                PipelineStage.TEST.value,
+                PipelineStage.DEPLOY_STAGING.value,
+                PipelineStage.DEPLOY_PROD.value,
+                PipelineStage.MONITOR.value
+            ]
+            failed_idx = stage_order.index(stage)
+            for s in stage_order[failed_idx + 1:]:
+                self.stages[s]["status"] = PipelineStageStatus.PENDING.value
+        return self.to_dict()
+
+    def reset(self):
+        """Сбрасывает пайплайн для нового запуска."""
+        for stage in self.stages.values():
+            stage["status"] = PipelineStageStatus.PENDING.value
+        self.current_stage = None
+        return self.to_dict()
+
+    def get_coverage_percentage(self) -> int:
+        """Возвращает процент покрытия CI/CD."""
+        implemented_stages = sum(
+            1 for s in self.stages.values()
+            if s["last_run"] is not None
+        )
+        return int((implemented_stages / len(self.stages)) * 100)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "created_at": self.created_at.isoformat(),
+            "stages": self.stages,
+            "current_stage": self.current_stage,
+            "total_runs": self.total_runs,
+            "successful_runs": self.successful_runs,
+            "failed_runs": self.failed_runs,
+            "is_automated": self.is_automated,
+            "coverage": self.get_coverage_percentage()
+        }
+
 class GameState:
     """Хранит все данные о текущем состоянии игры."""
     def __init__(self):
@@ -73,6 +726,19 @@ class GameState:
         self.wip_limit = 99
         self.knowledge = 0  # Knowledge sharing score (0-100)
         self.bus_factor = 1  # Number of people who know critical systems
+
+        # Additional metrics for level transitions (Levels 3-6)
+        self.bus_factor = 1  # Number of people who know critical systems
+        self.knowledge = 10  # Documentation and knowledge sharing percentage
+        self.process_efficiency = 20  # How well processes work
+        self.vsm_ratio = 90  # Value Stream Mapping waste ratio (lower is better)
+        self.learning_rate = 10  # How fast team learns from mistakes
+        self.experiment_velocity = 5  # Number of experiments per sprint
+        self.cicd_coverage = 0  # CI/CD automation percentage
+        self.quality_score = 30  # Code quality metric
+
+        # CI/CD Pipeline (available from Level 3)
+        self.cicd_pipeline = None  # CICDPipeline instance or None
 
         # Logs
         self.chat_history = [{"sender": "System", "text": "Добро пожаловать в симулятор 'Проект Феникс'!"}]
@@ -92,6 +758,21 @@ class GameState:
         }
 
         self.active_events = []
+        self.pending_event = None  # Event waiting for player response
+        self.event_history = []    # Past events and their outcomes
+
+        # Event System
+        self.event_chance = 0.15   # Base chance for event after each action
+
+        # Game Over State
+        self.game_over = None  # {'reason': str, 'title': str, 'message': str} or None
+
+        # Level Up State
+        self.level_up = None  # {'from': int, 'to': int, 'message': str} or None
+
+        # Level Goals - objectives to complete current level
+        self.level_goals = []  # List of {'id': str, 'description': str, 'current': int, 'target': int, 'completed': bool}
+        self.level_complete = None  # {'level': int, 'message': str, 'stats': dict} or None - shows modal when level is done
 
         # Game Over State
         self.game_over = None  # {'reason': str, 'title': str, 'message': str} or None
@@ -105,11 +786,32 @@ class GameState:
         self.velocity_history = []  # Track velocity across sprints
         self.sprint_counter = 1
 
+        # Daily Standup System
+        self.daily_standup_available = False  # Can trigger standup
+        self.standup_count = 0
+        self.last_standup_week = 0
+
+        # Training System (Level 2 feature)
+        self.training_in_progress = None  # {"trainee_id": "...", "weeks_remaining": N}
+        self.trainee_count = 0
+
     def to_dict(self):
         data = self.__dict__.copy()
         if self.current_sprint:
             data['current_sprint'] = self.current_sprint.to_dict()
         data['sprint_history'] = [s.to_dict() for s in self.sprint_history]
+        # Serialize pending event
+        if self.pending_event:
+            data['pending_event'] = self.pending_event.to_dict()
+        # Serialize event history
+        data['event_history'] = [
+            {"event": e["event"].to_dict() if hasattr(e["event"], "to_dict") else e["event"],
+             "choice_id": e["choice_id"], "consequences": e["consequences"]}
+            for e in self.event_history
+        ]
+        # Serialize CI/CD pipeline
+        if self.cicd_pipeline:
+            data['cicd_pipeline'] = self.cicd_pipeline.to_dict()
         return data
 
     @classmethod
@@ -138,6 +840,19 @@ class GameState:
                     sprint.end_time = datetime.fromisoformat(sprint_data['end_time'])
                 sprints.append(sprint)
             data['sprint_history'] = sprints
+        # Handle CI/CD pipeline deserialization
+        if 'cicd_pipeline' in data and data['cicd_pipeline']:
+            pipeline_data = data['cicd_pipeline']
+            pipeline = CICDPipeline(pipeline_data['id'], pipeline_data.get('name', 'Deployment Pipeline'))
+            pipeline.stages = pipeline_data.get('stages', pipeline.stages)
+            pipeline.current_stage = pipeline_data.get('current_stage')
+            pipeline.total_runs = pipeline_data.get('total_runs', 0)
+            pipeline.successful_runs = pipeline_data.get('successful_runs', 0)
+            pipeline.failed_runs = pipeline_data.get('failed_runs', 0)
+            pipeline.is_automated = pipeline_data.get('is_automated', False)
+            if pipeline_data.get('created_at'):
+                pipeline.created_at = datetime.fromisoformat(pipeline_data['created_at'])
+            data['cicd_pipeline'] = pipeline
         instance.__dict__.update(data)
         return instance
 
@@ -159,32 +874,604 @@ class MockLLM:
 
 class OpenRouterLLM:
     """Взаимодействует с LLM через OpenRouter для генерации ответов."""
-    def __init__(self, api_key):
-        self.client = None
-        self.model = "z-ai/glm-4.5-air:free"
 
-    def get_response(self, role, chat_history):
-        return "AI service is currently unavailable."
+    # Системные промпты для каждого персонажа
+    SYSTEM_PROMPTS = {
+        "erik": """Ты — Эрик Рид, наставник из книги "Проект Феникс". Ты мудрый ветеран DevOps,
+который помогает герою (Биллу) понять принципы потока, ограничений и непрерывных улучшений.
 
+Твой стиль:
+- Говоришь короткими, проницательными фразами
+- Задаешь наводящие вопросы вместо прямых ответов
+- Фокусируешься на поиске системных ограничений
+- Используешь метафоры (поток, ограничение, бутылочное горлышко)
+
+Ключевые концепции:
+- Теория ограничений: каждая система имеет одно ограничение
+- Четыре типа работы: Бизнес-проекты, Внутренние проекты, Изменения, Незапланированная работа
+- Незапланированная работа убивает продуктивность
+- WIP-лимиты помогают увидеть поток
+- Брент — это ограничение системы
+
+Отвечай на русском языке, кратко (1-2 предложения), в стиле мудрого наставника.""",
+
+        "developer": """Ты — разработчик в компании из "Проект Феникс". Ты перегружен работой,
+постоянно прерываешься на инциденты и не можешь сосредоточиться на главной задаче.
+
+Твой стиль:
+- Устал, фрустрирован
+- Жалуешься на постоянные переключения контекста
+- Хочешь работать над Project Phoenix, но всегда возникают пожары
+- Саркастический, но профессиональный
+
+Отвечай на русском языке, кратко (1-2 предложения), с усталым юмором.""",
+
+        "manager": """Ты — Стив, менеджер проекта из "Проект Феникс". Ты находишься под
+давлением со всех сторон: CFO требует зарплатную ведомость, маркетинг требует сайт,
+CISO требует патчи безопасности.
+
+Твой стиль:
+- Нервничаешь, но стараешься держаться
+- Фокусируешься на дедлайнах
+- Пытаешься распределить Брента на все задачи одновременно
+- Не понимаешь, почему ничего не успеваем
+
+Отвечай на русском языке, кратко (1-2 предложения), с нервным оттенком.""",
+
+        "cfo": """Ты — CFO компании из "Проект Феникс". Зарплатная ведомость не работает —
+люди не получат зарплату вовремя. Ты в ярости.
+
+Твой стиль:
+- Агрессивный, требовательный
+- Фокусируешься только на зарплатах
+- Грозишь увольнениями
+- Не интересуются техническими подробностями
+
+Отвечай на русском языке, кратко (1 предложение), очень требовательно.""",
+
+        "ciso": """Ты — CISO компании из "Проект Феникс". Обнаружена уязвимость в безопасности
+PII данных. Требуется немедленное исправление.
+
+Твой стиль:
+- Серьезный, озабоченный безопасностью
+- Фокусируешься на рисках утечки данных
+- Не терпишь отложек в вопросах безопасности
+- Профессиональный, но настойчивый
+
+Отвечай на русском языке, кратко (1-2 предложения), с озабоченностью.""",
+
+        "marketing": """Ты — глава маркетинга из "Проект Феникс". Сайт компании не работает,
+компания теряет лидов и клиентов каждую минуту.
+
+Твой стиль:
+- Паникуешь
+- Фокусируешься на упущенных продажах
+- Не понимаешь технических проблем
+- Требуешь немедленного решения
+
+Отвечай на русском языке, кратко (1-2 предложения), с паникой.""",
+
+        "stakeholder": """Ты — стейкхолдер/инвестор в компании из "Проект Феникс". Ты хочешь
+видеть прогресс по Project Phoenix.
+
+Твой стиль:
+- Деловой, ориентированный на результат
+- Спрашиваешь о статусе проекта
+- Не понимаешь, почему проект движется так медленно
+- Давишь на сроки
+
+Отвечай на русском языке, кратко (1-2 предложения), деловито.""",
+    }
+
+    def __init__(self, api_key: str, model: str = None):
+        """
+        Инициализация клиента OpenRouter.
+
+        Args:
+            api_key: API ключ OpenRouter (из переменной окружения OPENROUTER_API_KEY)
+            model: Модель для использования (по умолчанию бесплатные модели)
+        """
+        self.api_key = api_key
+        self.model = model or os.getenv("OPENROUTER_MODEL", "google/gemma-3-27b-it:free")
+        self.api_url = "https://openrouter.ai/api/v1/chat/completions"
+        self.headers = {
+            "Authorization": f"Bearer {api_key}",
+            "HTTP-Referer": "https://phoenix-simulator.dev",
+            "X-Title": "Phoenix Project Simulator",
+            "Content-Type": "application/json"
+        }
+        self._available = None  # Кэш доступности API
+
+    def is_available(self) -> bool:
+        """Проверяет, доступен ли API (есть ключ и работает)."""
+        if self._available is not None:
+            return self._available
+
+        if not self.api_key or self.api_key == "your-api-key-here":
+            self._available = False
+            return False
+
+        # Пробуем простой запрос для проверки
+        try:
+            response = requests.post(
+                self.api_url,
+                headers=self.headers,
+                json={
+                    "model": self.model,
+                    "messages": [{"role": "user", "content": "ping"}],
+                    "max_tokens": 1
+                },
+                timeout=10
+            )
+            self._available = response.status_code == 200
+        except Exception:
+            self._available = False
+
+        return self._available
+
+    def get_response(self, role: str, chat_history: Optional[List[Dict]] = None,
+                     context: Optional[Dict] = None) -> str:
+        """
+        Получает ответ от LLM для заданной роли.
+
+        Args:
+            role: Имя роли (erik, developer, manager, etc.)
+            chat_history: История чата для контекста
+            context: Дополнительный контекст (состояние игры, метрики и т.д.)
+
+        Returns:
+            Строка с ответом от LLM или fallback-ответ
+        """
+        if not self.is_available():
+            # Fallback на ответы MockLLM, если API недоступен
+            return self._get_fallback_response(role)
+
+        # Формируем сообщения для API
+        messages = []
+
+        # Системный промпт для роли
+        system_prompt = self.SYSTEM_PROMPTS.get(role.lower(), self.SYSTEM_PROMPTS["erik"])
+        messages.append({"role": "system", "content": system_prompt})
+
+        # Добавляем контекст игры если есть
+        if context:
+            context_str = self._format_context(context)
+            messages.append({
+                "role": "system",
+                "content": f"ТЕКУЩИЙ КОНТЕКСТ ИГРЫ:\n{context_str}\n\nУчитывай этот контекст при ответе."
+            })
+
+        # Добавляем историю чата (последние несколько сообщений)
+        if chat_history:
+            recent_history = chat_history[-5:] if len(chat_history) > 5 else chat_history
+            for msg in recent_history:
+                if msg.get("sender") and msg.get("text"):
+                    # Пропускаем системные сообщения
+                    if msg["sender"] != "System":
+                        role_mapping = {
+                            "user": "user",
+                            "assistant": "assistant",
+                            "Эрик": "user",
+                            "Брент": "user",
+                            "CFO": "user",
+                            "Steve": "user"
+                        }
+                        mapped_role = role_mapping.get(msg["sender"], "user")
+                        messages.append({
+                            "role": mapped_role,
+                            "content": msg["text"]
+                        })
+
+        # Добавляем prompt для генерации ответа
+        messages.append({
+            "role": "user",
+            "content": "Дай краткий ответ (1-2 предложения) на русском языке в соответствии с твоей ролью."
+        })
+
+        try:
+            response = requests.post(
+                self.api_url,
+                headers=self.headers,
+                json={
+                    "model": self.model,
+                    "messages": messages,
+                    "max_tokens": 150,
+                    "temperature": 0.8
+                },
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                if "choices" in data and len(data["choices"]) > 0:
+                    return data["choices"][0]["message"]["content"].strip()
+
+            # Если что-то пошло не так, используем fallback
+            return self._get_fallback_response(role)
+
+        except Exception as e:
+            # Логируем ошибку и возвращаем fallback
+            print(f"OpenRouter API error: {e}")
+            return self._get_fallback_response(role)
+
+    def _format_context(self, context: Dict) -> str:
+        """Форматирует контекст игры для промпта."""
+        parts = []
+        if "level" in context:
+            parts.append(f"Уровень: {context['level']}")
+        if "unplanned_work" in context:
+            parts.append(f"Незапланированная работа: {context['unplanned_work']}%")
+        if "budget" in context:
+            parts.append(f"Бюджет: ${context.get('budget', 0):,}")
+        if "wip_limit" in context:
+            parts.append(f"WIP-лимит: {context['wip_limit']}")
+        if "current_sprint" in context and context["current_sprint"]:
+            sprint = context["current_sprint"]
+            parts.append(f"Спринт: {sprint.get('id', 'N/A')}, Фаза: {sprint.get('phase', 'N/A')}")
+        return "\n".join(parts)
+
+    def _get_fallback_response(self, role: str) -> str:
+        """Возвращает базовые ответы, если API недоступен."""
+        fallback_responses = {
+            "erik": [
+                "Посмотри на поток. Где твое ограничение?",
+                "Ты постоянно тушишь пожары вместо того, чтобы работать над проектом.",
+                "Каждая система имеет ограничение. Найди его.",
+                "Сколько типов работы ты делаешь одновременно?",
+                "Брент — твое ограничение. Всё зависит от него."
+            ],
+            "developer": [
+                "Опять пожар? Я же пытался работать над фичей...",
+                "Понял, переключаюсь. Но когда мы наконец-то что-то доделаем?",
+                "Нужен четкий план. Постоянные переключения убивают продуктивность."
+            ],
+            "manager": [
+                "Команда, нам нужно ускориться!",
+                "Брент снова занят? Как мы будем распределять задачи?",
+                "Дедлайн близко. Давайте, сосредоточимся."
+            ],
+            "cfo": [
+                "Где мои деньги?! Зарплаты должны уйти сегодня!",
+                "Мне все равно на ваши технические проблемы — люди должны получить зарплату!"
+            ],
+            "ciso": [
+                "Это критическая уязвимость. Нельзя откладывать.",
+                "Безопасность прежде всего. Исправьте это немедленно."
+            ],
+            "marketing": [
+                "Сайт лежит! Мы теряем клиентов каждую минуту!",
+                "Маркетинг запущен, а сайт не работает. Это катастрофа!"
+            ],
+            "stakeholder": [
+                "Когда Project Phoenix будет готов?",
+                "Хочу видеть реальный прогресс, а не оправдания."
+            ]
+        }
+        responses = fallback_responses.get(role.lower(), fallback_responses["erik"])
+        return random.choice(responses)
+
+
+class PlanningPokerSession:
+    """Сессия Planning Poker для оценки задач."""
+    FIBONACCI_CARDS = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89]
+
+    def __init__(self, task_id: str, task_title: str):
+        self.task_id = task_id
+        self.task_title = task_title
+        self.player_vote = None
+        self.ai_votes = {}  # {"dev1": 5, "dev2": 8, ...}
+        self.consensus_reached = False
+        self.final_estimate = None
+        self.round = 1
+
+    def record_player_vote(self, vote: int):
+        self.player_vote = vote
+        self._generate_ai_votes()
+        self._check_consensus()
+        return self.to_dict()
+
+    def _generate_ai_votes(self):
+        """Генерирует голоса AI-членов команды."""
+        import random
+        # Simulated team members with different estimation styles
+        ai_members = [
+            {"id": "alice", "name": "Алиса (Senior Dev)", "style": "optimistic"},
+            {"id": "bob", "name": "Боб (QA)", "style": "careful"},
+            {"id": "carol", "name": "Кэрол (Tech Lead)", "style": "moderate"}
+        ]
+
+        # Base estimate influenced by player's vote if set
+        base = self.player_vote if self.player_vote else 5
+
+        for member in ai_members:
+            if member["style"] == "optimistic":
+                vote = max(1, min(21, random.choice([1, 2, 3, 5, 8])))
+            elif member["style"] == "careful":
+                vote = max(3, min(34, random.choice([3, 5, 8, 13, 21])))
+            else:  # moderate
+                vote = max(2, min(13, random.choice([2, 3, 5, 8, 13])))
+            self.ai_votes[member["id"]] = {
+                "name": member["name"],
+                "vote": vote
+            }
+
+    def _check_consensus(self):
+        """Проверяет, достигнут ли консенсус."""
+        all_votes = [self.player_vote] + [v["vote"] for v in self.ai_votes.values()]
+        # Consensus: all votes are same or adjacent in Fibonacci sequence
+        if len(set(all_votes)) == 1:
+            self.consensus_reached = True
+            self.final_estimate = self.player_vote
+        elif max(all_votes) - min(all_votes) <= 2:
+            # Close enough - use average rounded to nearest Fibonacci
+            avg = sum(all_votes) / len(all_votes)
+            self.final_estimate = self._nearest_fibonacci(avg)
+            self.consensus_reached = True
+
+    def _nearest_fibonacci(self, n):
+        """Находит ближайшее число Фибоначчи."""
+        for card in self.FIBONACCI_CARDS:
+            if abs(n - card) <= 1:
+                return card
+        return 5  # Default
+
+    def to_dict(self):
+        return {
+            "task_id": self.task_id,
+            "task_title": self.task_title,
+            "player_vote": self.player_vote,
+            "ai_votes": self.ai_votes,
+            "consensus_reached": self.consensus_reached,
+            "final_estimate": self.final_estimate,
+            "round": self.round,
+            "cards": self.FIBONACCI_CARDS
+        }
+
+class QuizSession:
+    """Сессия викторины для проверки знаний DevOps."""
+    QUESTIONS = [
+        {
+            "id": "q1",
+            "question": "Что такое ' bottleneck' (узкое место) в теории ограничений?",
+            "options": [
+                "Точка, где работа накапливается и замедляет весь поток",
+                "Самая быстрая часть процесса",
+                "Место для хранения ресурсов",
+                "Тип диаграммы Ганта"
+            ],
+            "correct": 0,
+            "explanation": "Узкое место — это этап процесса, который ограничивает общую пропускную способность. В Phoenix Project это Брент."
+        },
+        {
+            "id": "q2",
+            "question": "Какой из четырех типов работы представляет собой пожары и инциденты?",
+            "options": [
+                "Business Projects",
+                "Internal Projects",
+                "Changes",
+                "Unplanned Work"
+            ],
+            "correct": 3,
+            "explanation": "Незапланированная работа (Unplanned Work) — это пожары, инциденты и неожиданные проблемы."
+        },
+        {
+            "id": "q3",
+            "question": "Что означает WIP-лимит?",
+            "options": [
+                "Максимальное количество задач в работе одновременно",
+                "Время завершения спринта",
+                "Бюджет на квартал",
+                "Количество разработчиков в команде"
+            ],
+            "correct": 0,
+            "explanation": "WIP (Work In Progress) лимит ограничивает количество задач в работе, чтобы улучшить поток и уменьшить время выполнения."
+        },
+        {
+            "id": "q4",
+            "question": "Какой из принципов НЕ относится к Трем путям DevOps?",
+            "options": [
+                "Flow (Поток)",
+                "Feedback (Обратная связь)",
+                "Continual Learning and Experimentation (Непрерывное обучение)",
+                "Command and Control (Командование и контроль)"
+            ],
+            "correct": 3,
+            "explanation": "Command and Control — это традиционный подход, который DevOps заменяет на культуру доверия и сотрудничества."
+        },
+        {
+            "id": "q5",
+            "question": "Что такое Story Points в Planning Poker?",
+            "options": [
+                "Время в часах для выполнения задачи",
+                "Относительная оценка сложности задачи",
+                "Количество разработчиков",
+                "Приоритет задачи"
+            ],
+            "correct": 1,
+            "explanation": "Story Points — это относительная мера сложности, а не прямая оценка времени. Она учитывает риск, неопределенность и усилия."
+        },
+        {
+            "id": "q6",
+            "question": "Что показывает Cycle Time?",
+            "options": [
+                "Время от начала до конца работы над элементом",
+                "Время, прошедшее с момента запроса функции",
+                "Длительность встречи",
+                "Время обеденного перерыва"
+            ],
+            "correct": 0,
+            "explanation": "Cycle Time — это время, которое проходит с момента начала работы над задачей до её завершения. Ключевой метрики потока."
+        },
+        {
+            "id": "q7",
+            "question": "Что делать, если WIP-лимит превышен?",
+            "options": [
+                "Нанять больше людей",
+                "Перестать брать новые задачи, пока текущие не завершатся",
+                "Увеличить лимит без обсуждения",
+                "Игнорировать лимит"
+            ],
+            "correct": 1,
+            "explanation": "Когда WIP-лимит достигнут, нужно остановить старт новых задач и сфокусироваться на завершении текущих. Это суть Flow."
+        },
+        {
+            "id": "q8",
+            "question": "Кто такой Брент в Phoenix Project?",
+            "options": [
+                "CEO компании",
+                "Узкое место — единственный специалист, знающий критические системы",
+                "Клиент",
+                "Конкурент"
+            ],
+            "correct": 1,
+            "explanation": "Брент — это архетип узкого места: единственный человек, который знает, как работают критические системы. Все зависит от него."
+        }
+    ]
+
+    def __init__(self):
+        self.current_question = None
+        self.score = 0
+        self.total_answered = 0
+        self.answered_questions = []
+        self.last_answer_result = None  # Store last answer result for frontend
+
+    def get_random_question(self):
+        """Возвращает случайный вопрос, который еще не был задан."""
+        available = [q for q in self.QUESTIONS if q['id'] not in self.answered_questions]
+        if not available:
+            return None
+        return random.choice(available)
+
+    def start_question(self):
+        """Начинает новый вопрос."""
+        self.current_question = self.get_random_question()
+        return self.to_dict()
+
+    def answer(self, answer_index):
+        """Проверяет ответ и возвращает результат."""
+        if not self.current_question:
+            return {"error": "No active question"}
+
+        self.total_answered += 1
+        self.answered_questions.append(self.current_question['id'])
+
+        is_correct = answer_index == self.current_question['correct']
+        if is_correct:
+            self.score += 1
+
+        result = {
+            "question": self.current_question,
+            "answer_index": answer_index,
+            "is_correct": is_correct,
+            "correct_answer": self.current_question['correct'],
+            "explanation": self.current_question['explanation'],
+            "score": self.score,
+            "total": self.total_answered
+        }
+
+        self.current_question = None
+        self.last_answer_result = result  # Store for frontend access
+        return result
+
+    def to_dict(self):
+        return {
+            "current_question": self.current_question,
+            "score": self.score,
+            "total_answered": self.total_answered,
+            "remaining": len(self.QUESTIONS) - len(self.answered_questions),
+            "last_answer_result": self.last_answer_result
+        }
 
 class SimulationEngine:
     """Управляет игровыми сессиями с использованием LLM."""
-    def __init__(self):
+    def __init__(self, use_llm: bool = None):
+        """
+        Инициализация движка симуляции.
+
+        Args:
+            use_llm: Использовать реальный LLM (OpenRouter). Если None, определяет по наличию API ключа.
+        """
         self.active_game_state = None
-        self.llm = MockLLM()
+        self.event_generator = EventGenerator()
+        self.planning_poker_session = None
+        self.quiz_session = QuizSession()
+
+        # Определяем, использовать ли реальный LLM
+        if use_llm is None:
+            # Автоопределение по наличию API ключа
+            api_key = os.getenv("OPENROUTER_API_KEY", "")
+            use_llm = bool(api_key and api_key != "your-api-key-here")
+
+        if use_llm:
+            api_key = os.getenv("OPENROUTER_API_KEY", "")
+            model = os.getenv("OPENROUTER_MODEL", "google/gemma-3-27b-it:free")
+            self.llm = OpenRouterLLM(api_key, model)
+            self.llm_mode = "openrouter"
+            print(f"[Phoenix Simulator] Используем OpenRouter LLM: {model}")
+        else:
+            self.llm = MockLLM()
+            self.llm_mode = "mock"
+            print("[Phoenix Simulator] Используем Mock LLM (симуляция)")
 
         if not os.path.exists(SAVES_DIR):
             os.makedirs(SAVES_DIR)
 
     def new_game(self):
         self.active_game_state = GameState()
+        self.event_generator.reset_triggered()
         self._initialize_level_1()
-        return self.active_game_state.to_dict()
+        # Reset quiz session for new game
+        self.quiz_session = QuizSession()
+        return self.get_current_state()
 
-    def save_game(self, slot_id):
-        if not self.active_game_state: return {"error": "Нет активной игры для сохранения."}
+    def get_llm_response(self, role: str, context: Optional[Dict] = None) -> str:
+        """
+        Получает ответ от LLM для указанной роли.
+
+        Args:
+            role: Имя роли (erik, developer, manager, cfo, ciso, marketing, stakeholder)
+            context: Опциональный контекст (состояние игры)
+
+        Returns:
+            Строка с ответом от LLM
+        """
+        if self.llm_mode == "openrouter":
+            # Передаем контекст игры для более умных ответов
+            game_context = {}
+            if self.active_game_state:
+                game_context = {
+                    "level": self.active_game_state.level,
+                    "unplanned_work": self.active_game_state.unplanned_work,
+                    "budget": self.active_game_state.budget,
+                    "wip_limit": self.active_game_state.wip_limit,
+                    "current_sprint": self.active_game_state.current_sprint.to_dict() if self.active_game_state.current_sprint else None
+                }
+            if context:
+                game_context.update(context)
+
+            return self.llm.get_response(role, self.active_game_state.chat_history if self.active_game_state else None, game_context)
+        else:
+            # Mock LLM не использует контекст
+            return self.llm.get_response(role)
+
+    def save_game(self, slot_id, name=None):
+        """Saves the current game state to a slot."""
+        if not self.active_game_state:
+            return {"error": "Нет активной игры для сохранения."}
+
+        # Ensure saves directory exists
+        os.makedirs(SAVES_DIR, exist_ok=True)
+
         save_path = os.path.join(SAVES_DIR, f"save_{slot_id}.json")
-        with open(save_path, 'w', encoding='utf-8') as f: json.dump(self.active_game_state.to_dict(), f, ensure_ascii=False, indent=4)
+
+        # Get current state and add save metadata
+        state_dict = self.active_game_state.to_dict()
+        state_dict["save_name"] = name
+        state_dict["saved_at"] = datetime.now().isoformat()
+
+        with open(save_path, 'w', encoding='utf-8') as f:
+            json.dump(state_dict, f, ensure_ascii=False, indent=4)
+
         return {"success": True, "message": f"Игра сохранена в слот {slot_id}."}
 
     def load_game(self, slot_id):
@@ -194,8 +1481,45 @@ class SimulationEngine:
         return self.active_game_state.to_dict()
 
     def list_saves(self):
+        """Returns a list of save files with metadata."""
         saves = glob.glob(os.path.join(SAVES_DIR, 'save_*.json'))
-        return sorted([os.path.basename(s).replace('save_', '').replace('.json', '') for s in saves])
+        save_list = []
+
+        for save_path in saves:
+            try:
+                with open(save_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+
+                slot_id = os.path.basename(save_path).replace('save_', '').replace('.json', '')
+
+                # Get file modification time as fallback for saved_at
+                file_mtime = os.path.getmtime(save_path)
+
+                save_list.append({
+                    "slot_id": slot_id,
+                    "name": data.get("save_name") or f"Save {slot_id}",
+                    "week": data.get("week", 1),
+                    "level": data.get("level", 1),
+                    "saved_at": data.get("saved_at") or datetime.fromtimestamp(file_mtime).isoformat()
+                })
+            except (json.JSONDecodeError, KeyError, IOError) as e:
+                # Skip corrupted save files
+                continue
+
+        return {"saves": sorted(save_list, key=lambda x: x["slot_id"])}
+
+    def dismiss_notification(self, notification_type):
+        """Отклоняет уведомление и очищает его состояние."""
+        if not self.active_game_state:
+            return {"error": "Нет активной игры."}
+
+        state = self.active_game_state
+        if notification_type == 'game_over':
+            state.game_over = None
+        elif notification_type == 'level_up':
+            state.level_up = None
+
+        return state.to_dict()
 
     def dismiss_notification(self, notification_type):
         """Отклоняет уведомление и очищает его состояние."""
@@ -212,20 +1536,29 @@ class SimulationEngine:
 
     def get_current_state(self):
         if not self.active_game_state: return {"error": "Нет активной игры."}
-        return self.active_game_state.to_dict()
+        state = self.active_game_state.to_dict()
+        # Include planning poker session if active
+        if self.planning_poker_session:
+            state['planning_poker'] = self.planning_poker_session.to_dict()
+        else:
+            state['planning_poker'] = None
+        # Include quiz session
+        state['quiz'] = self.quiz_session.to_dict()
+        return state
 
     def process_action(self, action):
         if not self.active_game_state: return {"error": "Нет активной игры."}
         action_type = action.get('type')
 
         if action_type == 'event_choice': self._handle_event_choice(action)
+        elif action_type == 'level_complete_advance': self._handle_level_complete_advance(action)
         elif action_type == 'quiz_answer': self._handle_quiz_answer(action)
         elif action_type == 'task_move': self._handle_task_move(action)
         elif action_type == 'set_wip_limit': self._handle_set_wip_limit(action)
         elif action_type == 'minigame_result': self._handle_minigame_result(action)
         elif action_type == 'assign_resource': self._handle_assign_resource(action)
-        # Knowledge Sharing actions
-        elif action_type == 'knowledge_share': self._handle_knowledge_share(action)
+        elif action_type == 'train_developer': self._handle_train_developer(action)
+        elif action_type == 'advance_week': self._handle_advance_week(action)
         # Sprint actions
         elif action_type == 'sprint_create': self._handle_sprint_create(action)
         elif action_type == 'sprint_start': self._handle_sprint_start(action)
@@ -233,15 +1566,162 @@ class SimulationEngine:
         elif action_type == 'sprint_remove_task': self._handle_sprint_remove_task(action)
         elif action_type == 'sprint_end': self._handle_sprint_end(action)
         elif action_type == 'sprint_complete_retro': self._handle_sprint_complete_retro(action)
+        # Standup actions
+        elif action_type == 'standup_trigger': self._handle_standup_trigger(action)
+        # Planning Poker actions
+        elif action_type == 'poker_start': self._handle_poker_start(action)
+        elif action_type == 'poker_vote': self._handle_poker_vote(action)
+        elif action_type == 'poker_apply': self._handle_poker_apply(action)
+        elif action_type == 'poker_cancel': self._handle_poker_cancel(action)
+        elif action_type == 'poker_estimate': self._handle_poker_estimate(action)
+        # Quiz actions
+        elif action_type == 'quiz_start': self._handle_quiz_start(action)
+        elif action_type == 'quiz_submit_answer': self._handle_quiz_submit_answer(action)
+        # CI/CD Pipeline actions (Level 3+)
+        elif action_type == 'pipeline_create': self._handle_pipeline_create(action)
+        elif action_type == 'pipeline_start': self._handle_pipeline_start(action)
+        elif action_type == 'pipeline_advance': self._handle_pipeline_advance(action)
+        elif action_type == 'pipeline_reset': self._handle_pipeline_reset(action)
+        elif action_type == 'pipeline_automate': self._handle_pipeline_automate(action)
 
         self._check_level_transition()
-        return self.active_game_state.to_dict()
+        self._update_level_goals()
+        self._try_trigger_event()
+        return self.get_current_state()
+
+    # --- Level Goals System ---
+
+    def _set_level_goals(self, goals):
+        """Установить цели для текущего уровня."""
+        state = self.active_game_state
+        state.level_goals = []
+        for goal in goals:
+            state.level_goals.append({
+                'id': goal['id'],
+                'description': goal['description'],
+                'current': 0,
+                'target': goal['target'],
+                'completed': False,
+                'icon': goal.get('icon', '🎯')
+            })
+
+    def _update_level_goals(self):
+        """Обновить прогресс по goals на основе текущего состояния."""
+        state = self.active_game_state
+        if not state.level_goals:
+            return
+
+        all_complete = True
+
+        for goal in state.level_goals:
+            if goal['completed']:
+                continue
+
+            goal_id = goal['id']
+            target = goal['target']
+            current = 0
+
+            if goal_id == 'unplanned_done':
+                # Level 1: Unplanned tasks completed
+                current = len([t for t in state.tasks['done'] if t['type'] == WorkType.UNPLANNED])
+
+            elif goal_id == 'tasks_done':
+                # General: Any tasks done
+                current = len(state.tasks['done'])
+
+            elif goal_id == 'stability_target':
+                # Stability percentage
+                current = state.stability
+
+            elif goal_id == 'cicd_coverage':
+                # CI/CD automation coverage
+                current = state.cicd_coverage if state.cicd_pipeline else 0
+
+            elif goal_id == 'bus_factor':
+                # Bus factor (people who know critical systems)
+                current = state.bus_factor
+
+            elif goal_id == 'knowledge_share':
+                # Knowledge sharing percentage
+                current = state.knowledge
+
+            elif goal_id == 'process_efficiency':
+                # Process efficiency
+                current = state.process_efficiency
+
+            elif goal_id == 'vsm_ratio':
+                # Value Stream Mapping (lower is better, so we invert logic)
+                # Target is a max value, so current counts as "progress" when lower
+                if state.vsm_ratio <= target:
+                    current = target
+                else:
+                    # Partial progress based on how close we are
+                    current = max(0, target - (state.vsm_ratio - target))
+
+            elif goal_id == 'learning_rate':
+                current = state.learning_rate
+
+            elif goal_id == 'experiment_velocity':
+                current = state.experiment_velocity
+
+            goal['current'] = current
+            if current >= target:
+                goal['completed'] = True
+            else:
+                all_complete = False
+
+        # Check if level should be marked complete
+        if all_complete and not state.level_complete:
+            self._trigger_level_complete()
+
+    def _trigger_level_complete(self):
+        """Пометить уровень как завершённый и показать модалку."""
+        state = self.active_game_state
+        old_level = state.level
+
+        state.level_complete = {
+            'level': old_level,
+            'message': f'Level {old_level} Complete!',
+            'stats': {
+                'week': state.week,
+                'stability': state.stability,
+                'tasks_done': len(state.tasks['done']),
+                'goals': [g['description'] for g in state.level_goals if g['completed']]
+            }
+        }
+
+        state.chat_history.append({"sender": "System", "text": f"🎉 LEVEL {old_level} COMPLETE! Все цели достигнуты!"})
+
+    def _advance_to_next_level(self):
+        """Продвинуться на следующий уровень. Вызывается после закрытия модалки."""
+        state = self.active_game_state
+        current = state.level
+
+        state.level_complete = None  # Clear the modal
+
+        if current == 1:
+            self._initialize_level_2()
+        elif current == 2:
+            self._initialize_level_3()
+        elif current == 3:
+            self._initialize_level_4()
+        elif current == 4:
+            self._initialize_level_5()
+        elif current == 5:
+            self._initialize_level_6()
+        elif current == 6:
+            self._handle_game_win()
+
+    # --- Level Initialization ---
 
     def _initialize_level_1(self):
         state = self.active_game_state
         state.level = 1
         state.unplanned_work = 80
         state.wip_limit = 99 # No limit in Chaos phase
+
+        # Clear previous level complete
+        state.level_complete = None
 
         state.tasks["backlog"] = []
         state.tasks["in_progress"] = []
@@ -259,6 +1739,11 @@ class SimulationEngine:
         state.tasks["in_progress"] = chaos_tasks
         state.tasks["backlog"] = [phoenix_task]
 
+        # Set Level 1 Goals
+        self._set_level_goals([
+            {'id': 'unplanned_done', 'description': 'Complete all 3 critical incidents', 'target': 3, 'icon': '🔥'}
+        ])
+
         state.chat_history.append({"sender": "CFO", "text": "Где мои деньги?! Если зарплаты не уйдут к вечеру, у нас проблемы!"})
         state.chat_history.append({"sender": "Steve (Manager)", "text": "Билл, всё горит. Брент разрывается на части."})
         state.mentor_log.append({"sender": "Эрик", "text": "Посмотри на доску. Все красное. Это 'Незапланированная работа'. Она убивает твой проект."})
@@ -269,6 +1754,9 @@ class SimulationEngine:
         state.level = 2
         state.wip_limit = 3 # Strict Limit for Level 2
         state.unplanned_work = 20 # Stabilized
+
+        # Clear previous level complete
+        state.level_complete = None
 
         # Set level_up notification for frontend
         state.level_up = {
@@ -281,9 +1769,8 @@ class SimulationEngine:
             }
         }
 
-        # Keep existing 'Done' tasks but archive them conceptually.
-        # For simplicity, let's keep Phoenix in Backlog if it wasn't started, or move it to In Progress.
-        # We will add a mix of tasks to simulate flow.
+        # Archive completed tasks - clear done column for new level
+        state.tasks["done"] = []
 
         new_tasks = [
             {"id": "task-feat-2", "title": "Cart: One-Click Buy", "type": WorkType.BUSINESS, "points": 5, "duration": 3, "required_resource": None, "assigned_resource": None, "description": "Feature request from Marketing."},
@@ -293,8 +1780,96 @@ class SimulationEngine:
 
         state.tasks["backlog"].extend(new_tasks)
 
+        # Set Level 2 Goals
+        self._set_level_goals([
+            {'id': 'stability_target', 'description': 'Maintain 80%+ stability', 'target': 80, 'icon': '📊'},
+            {'id': 'tasks_done', 'description': 'Complete 5 tasks', 'target': 5, 'icon': '✅'}
+        ])
+
         state.chat_history.append({"sender": "System", "text": "--- УРОВЕНЬ 2: УВИДЕТЬ ПОТОК ---"})
         state.mentor_log.append({"sender": "Эрик", "text": "Поздравляю, ты потушил пожары. Теперь ты должен научиться видеть поток. Мы вводим WIP-лимиты. Не бери в работу больше 3 задач одновременно!"})
+        state.chat_history.append({"sender": "System", "text": "НОВАЯ МЕХАНИКА: Брент может обучать других разработчиков. Это займет время, но снизит зависимость от одного узкого места."})
+        state.mentor_log.append({"sender": "Эрик", "text": "Брент — твое узкое место. Ты можешь продолжать использовать его как затычку, ИЛИ он может обучить других. Выбор за тобой."})
+
+    def _initialize_level_3(self):
+        state = self.active_game_state
+        old_level = state.level
+        state.level = 3
+        state.wip_limit = 4  # Slightly increased
+        state.unplanned_work = 15  # Further stabilized
+
+        # Set level_up notification
+        state.level_up = {
+            'from': old_level,
+            'to': 3,
+            'message': 'LEVEL UP! Петля обратной связи. Визуализируй свой пайплайн доставки.',
+            'stats': {
+                'title': 'The Feedback Loop',
+                'objective': 'Create CI/CD pipeline and achieve 100% coverage with 85%+ stability.'
+            }
+        }
+
+        # Add quality-focused tasks including CI/CD pipeline
+        new_tasks = [
+            {"id": "task-cicd-init", "title": "Create CI/CD Pipeline", "type": WorkType.INTERNAL, "points": 8, "duration": 4, "required_resource": "brent", "assigned_resource": None, "description": "Создать базовый CI/CD пайплайн для визуализации процесса доставки кода."},
+            {"id": "task-auto-1", "title": "Automated Tests Setup", "type": WorkType.INTERNAL, "points": 8, "duration": 4, "required_resource": "brent", "assigned_resource": None, "description": "Внедрить автоматизированное тестирование."},
+            {"id": "task-qa-1", "title": "Integrate QA into Team", "type": WorkType.INTERNAL, "points": 5, "duration": 3, "required_resource": None, "assigned_resource": None, "description": "Интегрировать QA в команду разработки."},
+            {"id": "task-cab-1", "title": "Establish CAB Process", "type": WorkType.CHANGES, "points": 3, "duration": 2, "required_resource": None, "assigned_resource": None, "description": "Создать процесс CAB для управления изменениями."}
+        ]
+
+        state.tasks["backlog"].extend(new_tasks)
+
+        state.chat_history.append({"sender": "System", "text": "--- УРОВЕНЬ 3: ПЕТЛЯ ОБРАТНОЙ СВЯЗИ ---"})
+        state.mentor_log.append({"sender": "Эрик", "text": "Отлично! Теперь нужно сократить количество багов, доходящих до продакшена. Внедрите качество на источнике, создайте CI/CD пайплайн и формальный процесс управления изменениями (CAB)."})
+
+    def _initialize_level_4(self):
+        state = self.active_game_state
+        state.level = 4
+        state.wip_limit = 5
+
+        # Add automation tasks
+        new_tasks = [
+            {"id": "task-cicd-auto", "title": "Automate CI/CD Pipeline", "type": WorkType.INTERNAL, "points": 13, "duration": 6, "required_resource": "brent", "assigned_resource": None, "description": "Полностью автоматизировать CI/CD пайплайн для безучастного деплоя."},
+            {"id": "task-iac-1", "title": "Infrastructure as Code", "type": WorkType.INTERNAL, "points": 8, "duration": 4, "required_resource": "brent", "assigned_resource": None, "description": "Внедрить инфраструктуру как код."},
+            {"id": "task-doc-1", "title": "Document Brent's Knowledge", "type": WorkType.INTERNAL, "points": 5, "duration": 3, "required_resource": None, "assigned_resource": None, "description": "Документировать знания Брента для снижения bus factor."}
+        ]
+
+        state.tasks["backlog"].extend(new_tasks)
+
+        state.chat_history.append({"sender": "System", "text": "--- УРОВЕНЬ 4: КУЛЬТУРА УЛУЧШЕНИЙ ---"})
+        state.mentor_log.append({"sender": "Эрик", "text": "Пора строить культуру постоянного улучшения. Автоматизируйте всё, можно. Поощряйте эксперименты и обучайтесь на ошибках."})
+
+    def _initialize_level_5(self):
+        state = self.active_game_state
+        state.level = 5
+        state.wip_limit = 6
+
+        # Add continuous improvement tasks
+        new_tasks = [
+            {"id": "task-knowledge-1", "title": "Knowledge Sharing Sessions", "type": WorkType.INTERNAL, "points": 5, "duration": 2, "required_resource": None, "assigned_resource": None, "description": "Регулярные сессии обмена знаниями в команде."},
+            {"id": "task-vsm-1", "title": "Value Stream Mapping", "type": WorkType.INTERNAL, "points": 8, "duration": 4, "required_resource": None, "assigned_resource": None, "description": "Построить карту потока создания ценности для выявления потерь."},
+            {"id": "task-experiment-1", "title": "Run Experiments", "type": WorkType.BUSINESS, "points": 3, "duration": 1, "required_resource": None, "assigned_resource": None, "description": "Провести эксперименты для улучшения процессов."}
+        ]
+
+        state.tasks["backlog"].extend(new_tasks)
+
+        state.chat_history.append({"sender": "System", "text": "--- УРОВЕНЬ 5: ОРГАНИЗАЦИОННОЕ ОБУЧЕНИЕ ---"})
+        state.mentor_log.append({"sender": "Эрик", "text": "Вы готовы к следующему шагу. Сосредоточьтесь на обучении организации, снижении потерь и постоянном экспериментировании."})
+
+    def _initialize_level_6(self):
+        state = self.active_game_state
+        state.level = 6  # Max level - game is about winning
+
+        # Final challenge tasks
+        new_tasks = [
+            {"id": "final-1", "title": "Competitor Response Feature", "type": WorkType.BUSINESS, "points": 21, "duration": 10, "required_resource": "brent", "assigned_resource": None, "description": "Конкурент выпустил новую функцию! Нужно быстро ответить."},
+            {"id": "final-2", "title": "Scale to 10 Deploys/Day", "type": WorkType.INTERNAL, "points": 13, "duration": 6, "required_resource": "brent", "assigned_resource": None, "description": "Масштабировать систему до 10 деплоев в день."}
+        ]
+
+        state.tasks["backlog"].extend(new_tasks)
+
+        state.chat_history.append({"sender": "System", "text": "--- УРОВЕНЬ 6: ФИНАЛЬНЫЙ ВЫЗОВ ---"})
+        state.mentor_log.append({"sender": "Эрик", "text": "Финальный испытание! Конкуренты давят. Используйте всё, что вы узнали: поток, обратную связь, культуру улучшений. Покажите, на что способны!"})
 
     def _initialize_level_3(self):
         state = self.active_game_state
@@ -371,24 +1946,44 @@ class SimulationEngine:
         if state.level == 1:
             unplanned_done = len([t for t in state.tasks['done'] if t['type'] == WorkType.UNPLANNED])
             # We spawned 3 unplanned tasks. If 3 are done, we proceed.
-            # (Assuming player didn't delete them, which isn't possible yet)
             if unplanned_done >= 3:
                  self._initialize_level_2()
 
         # Level 2 -> Level 3 Transition
-        # Condition: Complete at least 2 business tasks and maintain stability
+        # Condition: Stability 80%, 5+ tasks done, WIP limit being used
         elif state.level == 2:
-            business_done = len([t for t in state.tasks['done'] if t['type'] == WorkType.BUSINESS])
-            if business_done >= 2:
+            tasks_done = len(state.tasks['done'])
+            if state.stability >= 80 and tasks_done >= 5:
                 self._initialize_level_3()
 
         # Level 3 -> Level 4 Transition
-        # Condition: Complete at least 1 internal task and 1 business task in level 3
+        # Condition: CI/CD 100%, stability 85%
         elif state.level == 3:
-            # Count tasks done in level 3 (simplified check)
-            total_done = len(state.tasks['done'])
-            if total_done >= 5:  # After completing 5 tasks total
+            if state.cicd_coverage >= 100 and state.stability >= 85:
                 self._initialize_level_4()
+
+        # Level 4 -> Level 5 Transition
+        # Condition: Bus factor 3+, knowledge 75%
+        elif state.level == 4:
+            if state.bus_factor >= 3 and state.knowledge >= 75:
+                self._initialize_level_5()
+
+        # Level 5 -> Level 6 Transition
+        # Condition: Process efficiency 80%, VSM ratio 25%
+        elif state.level == 5:
+            if state.process_efficiency >= 80 and state.vsm_ratio <= 25:
+                self._initialize_level_6()
+
+        # Level 6 Win Condition
+        # Condition: Learning rate 80%, experiment velocity 70%
+        elif state.level == 6:
+            if state.learning_rate >= 80 and state.experiment_velocity >= 70:
+                self._handle_game_win()
+
+    def _handle_game_win(self):
+        state = self.active_game_state
+        state.chat_history.append({"sender": "System", "text": "🎉 ПОБЕДА! Вы успешно трансформировали IT-отдел!"})
+        state.mentor_log.append({"sender": "Эрик", "text": "Невероятно! Вы превратили хаос в хорошо отлаженную машину. Команда учится, экспериментирует и постоянно улучшается. Вы готовы к любым вызовам!"})
 
     # --- Action Handlers ---
 
@@ -399,6 +1994,25 @@ class SimulationEngine:
 
         resource = next((r for r in state.resources if r['id'] == resource_id), None)
         if not resource: return
+
+        # Find the task to check requirements
+        task = None
+        for col in state.tasks.values():
+            for t in col:
+                if t['id'] == task_id:
+                    task = t
+                    break
+            if task: break
+
+        if not task: return
+
+        # Check if resource can handle the task
+        required_resource = task.get('required_resource')
+        if required_resource == 'brent':
+            # Only Brent or trained developers can handle Brent-required tasks
+            if resource_id != 'brent' and not resource.get('can_handle_brent_tasks'):
+                state.chat_history.append({"sender": "System", "text": f"{resource['name']} не имеет экспертизы для этой задачи. Требуется Брент или обученный разработчик."})
+                return
 
         if resource['busy_task_id']:
             for col in state.tasks.values():
@@ -424,9 +2038,102 @@ class SimulationEngine:
                      state.mentor_log.append({"sender": "Эрик", "text": "Ты используешь Брента как затычку. Он — твое ограничение."})
                 else:
                      state.mentor_log.append({"sender": "Эрик", "text": "Брент снова нужен? Помни, он не масштабируется."})
+            elif resource.get('can_handle_brent_tasks'):
+                # A trained developer is handling a Brent task
+                state.mentor_log.append({"sender": "Эрик", "text": f"Отлично! {resource['name']} берет на себя часть нагрузки Брента. Вот так работает расширение ограничения!"})
 
     def _handle_event_choice(self, action):
-        pass
+        """Handle player's choice for an event."""
+        state = self.active_game_state
+
+        if not state.pending_event:
+            return
+
+        choice_id = action.get('choice_id')
+        event = state.pending_event
+
+        # Find the selected choice
+        selected_choice = None
+        for choice in event.choices:
+            if choice['id'] == choice_id:
+                selected_choice = choice
+                break
+
+        if not selected_choice:
+            return
+
+        # Apply consequences
+        consequences = selected_choice.get('consequences', {})
+        applied = []
+
+        for key, value in consequences.items():
+            if key == 'budget':
+                state.budget += value
+                applied.append(f"Budget {'+$' if value >= 0 else '-$'}{abs(value)}")
+            elif key == 'stability':
+                state.stability = max(0, min(100, state.stability + value))
+                applied.append(f"Stability {'+' if value >= 0 else ''}{value}%")
+            elif key == 'morale':
+                state.morale = max(0, min(100, state.morale + value))
+                applied.append(f"Morale {'+' if value >= 0 else ''}{value}%")
+            elif key == 'unplanned_work':
+                state.unplanned_work = max(0, min(100, state.unplanned_work + value))
+                applied.append(f"Unplanned Work {'+' if value >= 0 else ''}{value}%")
+            elif key == 'wip_limit':
+                state.wip_limit = max(1, state.wip_limit + value)
+                applied.append(f"WIP Limit: {state.wip_limit}")
+
+        # Add to event history
+        state.event_history.append({
+            "event": event,
+            "choice_id": choice_id,
+            "choice_text": selected_choice['text'],
+            "consequences": consequences
+        })
+
+        # Log the outcome
+        result_text = f"Event resolved: {event.title}"
+        if applied:
+            result_text += f" | {', '.join(applied)}"
+        state.chat_history.append({"sender": "System", "text": result_text})
+
+        # Mentor feedback based on consequences
+        if consequences.get('stability', 0) < -10:
+            state.mentor_log.append({"sender": "Эрик", "text": "That choice has consequences. Consider the long-term impact on system stability."})
+        elif consequences.get('unplanned_work', 0) > 10:
+            state.mentor_log.append({"sender": "Эрик", "text": "You're adding more unplanned work. This is how fires start."})
+
+        # Clear pending event
+        state.pending_event = None
+
+    def _handle_level_complete_advance(self, action):
+        """Обработать нажатие 'Continue' на Level Complete modal."""
+        self._advance_to_next_level()
+
+    def _try_trigger_event(self):
+        """Try to trigger a random event based on game state."""
+        state = self.active_game_state
+
+        # Don't trigger if there's already a pending event
+        if state.pending_event:
+            return
+
+        # Don't trigger during modal phases (review/retro)
+        if state.current_sprint and state.current_sprint.phase in [SprintPhase.REVIEW, SprintPhase.RETRO]:
+            return
+
+        # Roll for event chance
+        if random.random() > state.event_chance:
+            return
+
+        # Try to generate an event
+        event = self.event_generator.generate_event(state)
+        if event:
+            state.pending_event = event
+            state.chat_history.append({
+                "sender": "EVENT",
+                "text": f"🚨 {event.title}: {event.description}"
+            })
 
     def _handle_quiz_answer(self, action):
         pass
@@ -493,61 +2200,85 @@ class SimulationEngine:
     def _handle_minigame_result(self, action):
         pass
 
-    def _handle_knowledge_share(self, action):
-        """Обрабатывает действия Knowledge Sharing."""
+    def _handle_train_developer(self, action):
+        """Начать обучение нового разработчика с помощью Брента."""
         state = self.active_game_state
-        share_type = action.get('share_type', 'documentation')  # documentation, mentoring, pair_programming
-        amount = action.get('amount', 10)
 
-        # Knowledge increases based on type
-        knowledge_gain = amount
-        if share_type == 'documentation':
-            knowledge_gain = 5
-            state.chat_history.append({"sender": "System", "text": "Брент создал документацию. Knowledge +5"})
-        elif share_type == 'mentoring':
-            knowledge_gain = 10
-            state.chat_history.append({"sender": "System", "text": "Брент провел менторскую сессию. Knowledge +10"})
-        elif share_type == 'pair_programming':
-            knowledge_gain = 15
-            state.chat_history.append({"sender": "System", "text": "Pair programming сессия завершена. Knowledge +15"})
+        # Only available in Level 2+
+        if state.level < 2:
+            state.chat_history.append({"sender": "System", "text": "Обучение доступно только на Уровне 2 и выше."})
+            return
 
-        state.knowledge = min(100, state.knowledge + knowledge_gain)
+        # Check if training is already in progress
+        if state.training_in_progress:
+            state.chat_history.append({"sender": "System", "text": f"Обучение уже идет! Осталось {state.training_in_progress['weeks_remaining']} нед."})
+            return
 
-        # Update bus_factor based on knowledge
-        if state.knowledge >= 25 and state.bus_factor < 2:
-            state.bus_factor = 2
-            state.mentor_log.append({"sender": "Эрик", "text": "Отлично! Теперь двое человек знают критические системы. Bus Factor: 2"})
-        elif state.knowledge >= 50 and state.bus_factor < 3:
-            state.bus_factor = 3
-            state.mentor_log.append({"sender": "Эрик", "text": "Прогресс! Трое человек могут покрыть друг друга. Bus Factor: 3"})
-        elif state.knowledge >= 75 and state.bus_factor < 4:
-            state.bus_factor = 4
-            state.mentor_log.append({"sender": "Эрик", "text": "Здорово! Команда становится устойчивой. Bus Factor: 4"})
-        elif state.knowledge >= 100 and state.bus_factor < 5:
-            state.bus_factor = 5
-            state.mentor_log.append({"sender": "Эрик", "text": "Превосходно! Знания распределены по команде. Bus Factor: 5"})
+        # Check if Brent is available
+        brent = next((r for r in state.resources if r['id'] == 'brent'), None)
+        if not brent:
+            return
 
-        # Add new developer resource when bus_factor increases
-        self._ensure_developers_for_bus_factor()
+        if brent.get('busy_task_id'):
+            state.chat_history.append({"sender": "System", "text": "Брент занят! Он не может обучать, пока работает над задачей."})
+            state.mentor_log.append({"sender": "Эрик", "text": "Чтобы обучить кого-то, Брент должен быть свободен. Освободи его от текущих задач."})
+            return
 
-    def _ensure_developers_for_bus_factor(self):
-        """Добавляет разработчиков в resources в соответствии с bus_factor."""
+        # Start training (takes 3 weeks)
+        trainee_id = f"trainee_{state.trainee_count + 1}"
+        state.trainee_count += 1
+        state.training_in_progress = {
+            "trainee_id": trainee_id,
+            "trainee_name": f"Стажер {state.trainee_count}",
+            "weeks_remaining": 3
+        }
+
+        # Mark Brent as busy with training
+        brent['busy_task_id'] = 'training'
+
+        state.chat_history.append({"sender": "System", "text": f"Брент начал обучение стажера! Это займет 3 недели. Брент недоступен для задач."})
+        state.mentor_log.append({"sender": "Эрик", "text": "Хорошее решение. Инвестиция в обучение. Короткосрочно Брент недоступен, но долгосрочно ты снизишь зависимость от одного узкого места."})
+
+    def _handle_advance_week(self, action):
+        """Продвинуть время на 1 неделю. Обновляет обучение, прогресс задач."""
         state = self.active_game_state
-        target_devs = state.bus_factor  # Brent + (bus_factor - 1) other developers
+        state.week += 1
 
-        current_dev_count = len(state.resources)
+        # Update training progress
+        if state.training_in_progress:
+            state.training_in_progress['weeks_remaining'] -= 1
 
-        while len(state.resources) < target_devs:
-            new_dev_id = f"dev{len(state.resources)}"
-            new_dev = {
-                "id": new_dev_id,
-                "name": f"Разработчик {len(state.resources)}",
-                "role": "Software Engineer",
-                "avatar": f"{new_dev_id}_avatar.png",
-                "busy_task_id": None
-            }
-            state.resources.append(new_dev)
-            state.chat_history.append({"sender": "System", "text": f"{new_dev['name']} присоединился к команде и готов к работе!"})
+            if state.training_in_progress['weeks_remaining'] <= 0:
+                # Training complete! Add new resource
+                trainee_id = state.training_in_progress['trainee_id']
+                trainee_name = state.training_in_progress['trainee_name']
+
+                new_resource = {
+                    "id": trainee_id,
+                    "name": trainee_name,
+                    "role": "Developer",
+                    "avatar": "dev_avatar.png",
+                    "busy_task_id": None,
+                    "can_handle_brent_tasks": True  # Key: can now do tasks requiring Brent
+                }
+
+                state.resources.append(new_resource)
+
+                # Free up Brent
+                brent = next((r for r in state.resources if r['id'] == 'brent'), None)
+                if brent:
+                    brent['busy_task_id'] = None
+
+                state.chat_history.append({"sender": "System", "text": f"Обучение завершено! {trainee_name} теперь готов к работе и может выполнять задачи, требующие экспертизы Брента!"})
+                state.mentor_log.append({"sender": "Эрик", "text": f"Отлично! {trainee_name} готов. Теперь у вас есть еще один человек, который может справляться с критическими задачами. Так расширяется пропускная способность ограничения."})
+
+                state.training_in_progress = None
+            else:
+                state.chat_history.append({"sender": "System", "text": f"Обучение продолжается. Осталось {state.training_in_progress['weeks_remaining']} нед."})
+
+        # Update task progress (simplified - tasks in progress may move to review)
+        # This is a basic implementation; real game would have more sophisticated progress
+        state.chat_history.append({"sender": "System", "text": f"--- Неделя {state.week} ---"})
 
     # --- Sprint Action Handlers ---
 
@@ -585,6 +2316,9 @@ class SimulationEngine:
         state.current_sprint.phase = SprintPhase.ACTIVE
         state.current_sprint.start_time = datetime.now()
         state.current_sprint.current_week = 1
+
+        # Enable Daily Standup
+        state.daily_standup_available = True
 
         # Calculate planned velocity
         planned_points = 0
@@ -665,5 +2399,299 @@ class SimulationEngine:
 
         state.chat_history.append({"sender": "System", "text": f"Sprint {completed_sprint_id} завершен. Готовы к новому циклу!"})
         state.mentor_log.append({"sender": "Эрик", "text": "Ретроспектива завершена. Что вы улучшите в следующем спринте?"})
+
+    def _handle_standup_trigger(self, action):
+        """Обрабатывает Daily Standup."""
+        state = self.active_game_state
+
+        # Only allow standup during active sprint
+        if not state.current_sprint or state.current_sprint.phase != SprintPhase.ACTIVE:
+            state.chat_history.append({"sender": "System", "text": "Daily Standup доступен только во время активного спринта."})
+            return
+
+        # Increment standup counter
+        state.standup_count += 1
+        state.last_standup_week = state.current_sprint.current_week
+
+        # Generate standup updates from team members based on their tasks
+        in_progress_tasks = state.tasks.get('in_progress', [])
+
+        # Brent's update
+        brent_task = next((t for t in in_progress_tasks if t.get('assigned_resource') == 'brent'), None)
+        if brent_task:
+            state.chat_history.append({
+                "sender": "Брент",
+                "text": f"Вчера: работал над {brent_task['title']}. Сегодня: продолжу. Блокеров нет, но я единственный, кто может это сделать."
+            })
+        elif len(in_progress_tasks) > 0:
+            state.chat_history.append({
+                "sender": "Брент",
+                "text": f"Свободен. Жду назначения. В работе {len(in_progress_tasks)} задач."
+            })
+
+        # Manager's update
+        manager_blocked = len([t for t in in_progress_tasks if t.get('required_resource') and not t.get('assigned_resource')])
+        if manager_blocked > 0:
+            state.chat_history.append({
+                "sender": "Steve (Manager)",
+                "text": f"Вчера: пытался расставить ресурсы. Сегодня: {manager_blocked} задач заблокированы из-за нехватки Брента."
+            })
+        else:
+            state.chat_history.append({
+                "sender": "Steve (Manager)",
+                "text": f"Команда работает. {len(in_progress_tasks)} задач в прогрессе. Всё по плану."
+            })
+
+        # Mentor insight based on standup
+        if len(in_progress_tasks) > state.wip_limit:
+            state.mentor_log.append({
+                "sender": "Эрик",
+                "text": "Обрати внимание на Standup. Слишком много работы в прогрессе означает долгий цикл обратной связи."
+            })
+        elif manager_blocked > 0:
+            state.mentor_log.append({
+                "sender": "Эрик",
+                "text": "Standup выявил блокер. Брент — твое ограничение. Всё, что требует Брента, ждет его."
+            })
+        else:
+            state.mentor_log.append({
+                "sender": "Эрик",
+                "text": "Хороший Standup. Команда синхронизирована. Продолжай фокусироваться на завершении."
+            })
+
+        state.daily_standup_available = False
+
+    # --- Planning Poker Handlers ---
+
+    def _handle_poker_start(self, action):
+        """Начать сессию Planning Poker для задачи."""
+        state = self.active_game_state
+        task_id = action.get('task_id')
+
+        # Find the task
+        task = None
+        for col in state.tasks.values():
+            for t in col:
+                if t['id'] == task_id:
+                    task = t
+                    break
+            if task: break
+
+        if not task:
+            state.chat_history.append({"sender": "System", "text": "Задача не найдена."})
+            return
+
+        self.planning_poker_session = PlanningPokerSession(task_id, task['title'])
+        state.chat_history.append({"sender": "System", "text": f"🎴 Planning Poker начат для: {task['title']}"})
+        state.mentor_log.append({"sender": "Эрик", "text": "Planning Poker помогает команде достичь консенсуса в оценке. Выберите карту, когда будете готовы."})
+
+    def _handle_poker_vote(self, action):
+        """Игрок делает свой ход в Planning Poker."""
+        state = self.active_game_state
+        if not self.planning_poker_session:
+            return
+
+        vote = action.get('vote')
+        if vote not in PlanningPokerSession.FIBONACCI_CARDS:
+            return
+
+        result = self.planning_poker_session.record_player_vote(vote)
+
+        if result['consensus_reached']:
+            state.chat_history.append({"sender": "System", "text": f"🎯 Консенсус! Оценка: {result['final_estimate']} pts"})
+            state.mentor_log.append({"sender": "Эрик", "text": f"Отлично! Команда договорилась на {result['final_estimate']} story points."})
+        else:
+            votes_str = ", ".join([f"{v['name']}: {v['vote']}" for v in result['ai_votes'].values()])
+            state.chat_history.append({"sender": "System", "text": f"🃏 Голоса: Вы: {vote} | {votes_str}"})
+            state.mentor_log.append({"sender": "Эрик", "text": "Оценки разнятся. Обсудите задачу и проголосуйте снова или примите усредненную оценку."})
+
+    def _handle_poker_apply(self, action):
+        """Применить финальную оценку к задаче."""
+        state = self.active_game_state
+        if not self.planning_poker_session or not self.planning_poker_session.consensus_reached:
+            return
+
+        final_estimate = self.planning_poker_session.final_estimate
+        task_id = self.planning_poker_session.task_id
+
+        # Update task points
+        for col in state.tasks.values():
+            for t in col:
+                if t['id'] == task_id:
+                    t['points'] = final_estimate
+                    state.chat_history.append({"sender": "System", "text": f"✅ Задаче '{t['title']}' присвоено {final_estimate} pts"})
+                    break
+
+        self.planning_poker_session = None
+
+    def _handle_poker_cancel(self, action):
+        """Отменить сессию Planning Poker."""
+        self.planning_poker_session = None
+        self.active_game_state.chat_history.append({"sender": "System", "text": "Planning Poker отменен."})
+
+    def _handle_poker_estimate(self, action):
+        """Применить оценку Planning Poker напрямую к задаче."""
+        state = self.active_game_state
+        task_id = action.get('task_id')
+        estimate = action.get('estimate', 0)
+
+        # Find and update the task
+        task_found = False
+        task_title = ""
+        for col in state.tasks.values():
+            for t in col:
+                if t['id'] == task_id:
+                    old_points = t.get('points', 0)
+                    t['points'] = estimate
+                    task_found = True
+                    task_title = t.get('title', 'Unknown')
+                    break
+            if task_found:
+                break
+
+        if task_found:
+            state.chat_history.append({
+                "sender": "System",
+                "text": f"🃏 Planning Poker: Задача '{task_title}' оценена в {estimate} pts (было {old_points})"
+            })
+            state.mentor_log.append({
+                "sender": "Erik",
+                "text": f"Good work! Team consensus on {estimate} story points. This estimation technique helps reveal different perspectives."
+            })
+        else:
+            state.chat_history.append({"sender": "System", "text": "❌ Задача не найдена."})
+
+    # --- Quiz Handlers ---
+
+    def _handle_quiz_start(self, action):
+        """Начать новый вопрос викторины."""
+        state = self.active_game_state
+        result = self.quiz_session.start_question()
+
+        if result['current_question']:
+            state.chat_history.append({"sender": "System", "text": "🧠 Викторина: Проверь свои знания DevOps!"})
+            state.mentor_log.append({"sender": "Эрик", "text": "Хороший способ закрепить знания — ответить на вопрос. Давай проверим, что ты усвоил."})
+        else:
+            state.chat_history.append({"sender": "System", "text": f"🎉 Викторина завершена! Твой счет: {self.quiz_session.score}/{len(QuizSession.QUESTIONS)}"})
+            state.mentor_log.append({"sender": "Эрик", "text": f"Отличная работа! Ты ответил правильно на {self.quiz_session.score} из {len(QuizSession.QUESTIONS)} вопросов."})
+
+    def _handle_quiz_submit_answer(self, action):
+        """Отправить ответ на вопрос викторины."""
+        state = self.active_game_state
+        answer_index = action.get('answer_index')
+
+        result = self.quiz_session.answer(answer_index)
+
+        if 'error' not in result:
+            if result['is_correct']:
+                state.chat_history.append({"sender": "System", "text": f"✅ Правильно! {result['explanation']}"})
+                state.mentor_log.append({"sender": "Эрик", "text": "Отлично! Ты понимаешь суть."})
+            else:
+                state.chat_history.append({"sender": "System", "text": f"❌ Неправильно. {result['explanation']}"})
+                state.mentor_log.append({"sender": "Эрик", "text": "Не страшно ошибаться — главное, учиться на ошибках."})
+
+    # --- CI/CD Pipeline Action Handlers (Level 3+) ---
+
+    def _handle_pipeline_create(self, action):
+        """Создает новый CI/CD пайплайн."""
+        state = self.active_game_state
+
+        # Only available in Level 3+
+        if state.level < 3:
+            state.chat_history.append({"sender": "System", "text": "CI/CD пайплайн доступен только на Уровне 3 и выше."})
+            return
+
+        # Check if pipeline already exists
+        if state.cicd_pipeline:
+            state.chat_history.append({"sender": "System", "text": "Пайплайн уже создан!"})
+            return
+
+        # Create the pipeline
+        pipeline_id = f"pipeline-{state.week}-{len(state.sprint_history)}"
+        state.cicd_pipeline = CICDPipeline(pipeline_id, "Deployment Pipeline")
+
+        state.chat_history.append({"sender": "System", "text": "🚀 CI/CD Pipeline создан! Теперь вы можете визуализировать и управлять процессом деплоя."})
+        state.mentor_log.append({"sender": "Эрик", "text": "Отлично! Пайплайн создан. Теперь вы видите весь путь кода от коммита до продакшена. Это Second Way — быстрая обратная связь."})
+
+    def _handle_pipeline_start(self, action):
+        """Запускает пайплайн с начала."""
+        state = self.active_game_state
+
+        if not state.cicd_pipeline:
+            state.chat_history.append({"sender": "System", "text": "Сначала создайте пайплайн!"})
+            return
+
+        state.cicd_pipeline.start_pipeline()
+        state.chat_history.append({"sender": "System", "text": "🔧 Пайплайн запущен: BUILD → TEST → STAGING → PROD → MONITOR"})
+
+    def _handle_pipeline_advance(self, action):
+        """Продвигает пайплайн на следующий этап."""
+        state = self.active_game_state
+
+        if not state.cicd_pipeline:
+            return
+
+        pipeline = state.cicd_pipeline
+        result = pipeline.advance_stage()
+
+        # Update cicd_coverage metric from pipeline
+        state.cicd_coverage = pipeline.get_coverage_percentage()
+
+        if pipeline.current_stage:
+            stage_names = {
+                "build": "BUILD",
+                "test": "TEST",
+                "deploy_staging": "STAGING",
+                "deploy_prod": "PRODUCTION",
+                "monitor": "MONITOR"
+            }
+            state.chat_history.append({"sender": "System", "text": f"✓ {stage_names.get(pipeline.current_stage, pipeline.current_stage)} этап запущен..."})
+
+            # Erik's feedback based on stage
+            if pipeline.current_stage == "test":
+                state.mentor_log.append({"sender": "Эрик", "text": "Автотесты — это ключ к быстрой обратной связи. Чем быстрее найдете баг, тем дешевле его исправить."})
+            elif pipeline.current_stage == "deploy_prod":
+                state.mentor_log.append({"sender": "Эрик", "text": "Деплой в прод должен быть рутиной. Если вы волнуетесь при деплое — у вас проблемы с процессом."})
+        else:
+            # Pipeline complete
+            state.chat_history.append({"sender": "System", "text": f"🎉 Пайплайн успешно завершен! Coverage: {state.cicd_coverage}%"})
+            state.mentor_log.append({"sender": "Эрик", "text": "Превосходно! Код прошел весь путь до продакшена. Это и есть DevOps — быстрая и безопасная доставка ценности."})
+
+    def _handle_pipeline_reset(self, action):
+        """Сбрасывает пайплайн для нового запуска."""
+        state = self.active_game_state
+
+        if not state.cicd_pipeline:
+            return
+
+        state.cicd_pipeline.reset()
+        state.chat_history.append({"sender": "System", "text": "Пайплайн сброшен. Готов к новому запуску."})
+
+    def _handle_pipeline_automate(self, action):
+        """Включает автоматизацию пайплайна (дорогое улучшение)."""
+        state = self.active_game_state
+
+        if not state.cicd_pipeline:
+            state.chat_history.append({"sender": "System", "text": "Сначала создайте пайплайн!"})
+            return
+
+        if state.cicd_pipeline.is_automated:
+            state.chat_history.append({"sender": "System", "text": "Пайплайн уже автоматизирован!"})
+            return
+
+        # Check budget
+        automation_cost = 15000
+        if state.budget < automation_cost:
+            state.chat_history.append({"sender": "System", "text": f"Недостаточно бюджета! Нужно ${automation_cost}, есть ${state.budget}"})
+            state.mentor_log.append({"sender": "Эрик", "text": "Автоматизация требует инвестиций, но окупается в долгосрочной перспективе."})
+            return
+
+        # Enable automation
+        state.budget -= automation_cost
+        state.cicd_pipeline.is_automated = True
+        state.cicd_coverage = 100  # Full coverage when automated
+
+        state.chat_history.append({"sender": "System", "text": f"✨ Пайплайн автоматизирован! -${automation_cost} из бюджета"})
+        state.mentor_log.append({"sender": "Эрик", "text": "Автоматизация — это Third Way. Теперь деплой происходит без участия человека, быстро и надежно."})
 
 engine = SimulationEngine()

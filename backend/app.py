@@ -16,9 +16,10 @@ def new_game():
 def save_game():
     """Сохраняет текущую игру в указанный слот."""
     slot_id = request.json.get('slot_id')
+    name = request.json.get('name')
     if not slot_id:
         return jsonify({"error": "slot_id is required"}), 400
-    return jsonify(engine.save_game(slot_id))
+    return jsonify(engine.save_game(slot_id, name))
 
 @app.route('/api/load_game', methods=['POST'])
 def load_game():
@@ -26,7 +27,16 @@ def load_game():
     slot_id = request.json.get('slot_id')
     if not slot_id:
         return jsonify({"error": "slot_id is required"}), 400
-    return jsonify(engine.load_game(slot_id))
+
+    result = engine.load_game(slot_id)
+
+    # Check if result is an error
+    if "error" in result:
+        return jsonify(result), 404
+
+    # Return success flag with state
+    result["success"] = True
+    return jsonify(result)
 
 @app.route('/api/saves', methods=['GET'])
 def list_saves():
@@ -57,6 +67,22 @@ def handle_action():
 
     new_state = engine.process_action(action_data)
     return jsonify(new_state)
+
+@app.route('/api/llm_response', methods=['POST'])
+def get_llm_response():
+    """Получает ответ от LLM для указанной роли."""
+    data = request.json
+    if not data or 'role' not in data:
+        return jsonify({"error": "role is required"}), 400
+
+    role = data.get('role')
+    response = engine.get_llm_response(role)
+
+    return jsonify({
+        "role": role,
+        "response": response,
+        "llm_mode": engine.llm_mode
+    })
 
 
 # --- Маршрут для обслуживания фронтенда ---
