@@ -1,0 +1,32 @@
+# TTS Utility v1 - Qwen3-TTS + vLLM-Omni
+# Text-to-Speech with voice cloning and multi-language support
+
+# Core TTS
+qwen-tts>=0.1.0
+
+# vLLM-Omni for production deployment
+vllm-omni>=0.1.0
+
+# Audio processing
+soundfile>=0.12.1
+librosa>=0.10.0
+numpy>=1.24.0
+
+# Web framework for API
+flask>=3.0.0
+flask-cors>=4.0.0
+
+# OpenAI API compatibility
+openai>=1.0.0
+
+# CLI
+click>=8.1.0
+rich>=13.0.0
+
+# Utilities
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+python-dotenv>=1.0.0
+
+# Optional: FlashAttention for RTX 4090 optimization
+# Install separately: pip install flash-attn --no-build-isolation
