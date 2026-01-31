@@ -852,6 +852,110 @@ body {
     border-color: var(--accent-primary);
 }
 
+/* --- LEVEL COMPLETE MODAL --- */
+.level-complete-modal {
+    max-width: 500px;
+    text-align: center;
+}
+
+.level-complete-header {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(59, 130, 246, 0.2));
+    border-bottom: 1px solid var(--accent-success);
+}
+
+.level-complete-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+    animation: bounceIn 0.5s ease-out;
+}
+
+@keyframes bounceIn {
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+#level-complete-title {
+    font-size: 24px;
+    color: var(--accent-success);
+    margin-bottom: 8px;
+}
+
+.level-complete-message {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+}
+
+.level-complete-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px;
+    background: var(--bg-dark);
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.level-complete-stats .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.level-complete-stats .stat-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.level-complete-stats .stat-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.level-complete-goals {
+    text-align: left;
+    padding: 16px;
+    background: rgba(34, 197, 94, 0.1);
+    border-radius: 8px;
+    border: 1px solid var(--accent-success);
+}
+
+.level-complete-goals h4 {
+    font-size: 14px;
+    color: var(--accent-success);
+    margin-bottom: 12px;
+}
+
+#level-complete-goals-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+#level-complete-goals-list li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+#level-complete-goals-list li::before {
+    content: '✓';
+    color: var(--accent-success);
+}
+
 /* --- UI/UX POLISH: ANIMATIONS --- */
 
 /* Keyframe Animations */

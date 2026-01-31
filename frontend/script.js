@@ -321,6 +321,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const reviewToRetroBtn = document.getElementById('review-to-retro');
     const retroModal = document.getElementById('retro-modal');
     const retroCompleteBtn = document.getElementById('retro-complete');
+    // Level Complete Modal
+    const levelCompleteModal = document.getElementById('level-complete-modal');
+    const levelCompleteAdvanceBtn = document.getElementById('level-complete-advance');
     // Progress Indicators
     const levelProgressBar = document.getElementById('level-progress-bar');
     const levelProgressText = document.getElementById('level-progress-text');
@@ -459,6 +462,8 @@ document.addEventListener('DOMContentLoaded', () => {
         planningConfirm.onclick = createSprint;
         reviewToRetroBtn.onclick = goToRetro;
         retroCompleteBtn.onclick = completeRetro;
+        // Level Complete Modal
+        if (levelCompleteAdvanceBtn) levelCompleteAdvanceBtn.onclick = handleLevelCompleteAdvance;
 
         tabBtns.forEach(btn => {
             btn.addEventListener('click', () => {
@@ -532,6 +537,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 4: "The Third Way (Continual Learning)"
             };
             Animator.showLevelUp(currentState.level, state.level, levelNames[state.level] || '');
+        }
+
+        // Check for level_up modal notification from backend
+        if (state.level_up) {
+            showLevelCompleteModal(state.level_up);
         }
 
         // Check for sprint phase changes
@@ -1111,6 +1121,39 @@ document.addEventListener('DOMContentLoaded', () => {
             type: 'sprint_complete_retro',
             notes: notes
         });
+    }
+
+    // --- Level Complete Modal Handlers ---
+    function showLevelCompleteModal(levelUpData) {
+        if (!levelCompleteModal) return;
+
+        const level = levelUpData.to || levelUpData.level || 1;
+        document.getElementById('level-complete-title').textContent = `Level ${level} Complete!`;
+        document.getElementById('level-complete-message').textContent = levelUpData.message || 'All goals achieved!';
+
+        if (levelUpData.stats) {
+            document.getElementById('level-complete-week').textContent = levelUpData.stats.week || 1;
+            document.getElementById('level-complete-stability').textContent = `${levelUpData.stats.stability || 80}%`;
+            document.getElementById('level-complete-tasks').textContent = levelUpData.stats.tasks_done || 0;
+        }
+
+        const goalsList = document.getElementById('level-complete-goals-list');
+        if (levelUpData.stats && levelUpData.stats.goals) {
+            goalsList.innerHTML = levelUpData.stats.goals.map(g => `<li>${g}</li>`).join('');
+        } else {
+            goalsList.innerHTML = '<li>All objectives completed!</li>';
+        }
+
+        SoundSystem.play('levelUp');
+        levelCompleteModal.style.display = 'flex';
+    }
+
+    async function handleLevelCompleteAdvance() {
+        if (!levelCompleteModal) return;
+
+        levelCompleteModal.style.display = 'none';
+
+        await sendAction({ type: 'level_complete_advance' });
     }
 
     init();

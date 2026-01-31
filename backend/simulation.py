@@ -1616,6 +1616,8 @@ class SimulationEngine:
         elif action_type == 'experiment_create': self._handle_experiment_create(action)
         elif action_type == 'experiment_start': self._handle_experiment_start(action)
         elif action_type == 'experiment_cancel': self._handle_experiment_cancel(action)
+        # Level progression actions
+        elif action_type == 'level_complete_advance': self._handle_level_complete_advance(action)
 
         self._check_level_transition()
         self._try_trigger_event()
@@ -2187,6 +2189,15 @@ class SimulationEngine:
 
         state.chat_history.append({"sender": "System", "text": f"Sprint {completed_sprint_id} завершен. Готовы к новому циклу!"})
         state.mentor_log.append({"sender": "Эрик", "text": "Ретроспектива завершена. Что вы улучшите в следующем спринте?"})
+
+    def _handle_level_complete_advance(self, action):
+        """Обрабатывает нажатие кнопки 'Продолжить' после завершения уровня."""
+        state = self.active_game_state
+        if not state:
+            return
+
+        # Clear level_up notification to advance to next level
+        state.level_up = None
 
     def _handle_standup_trigger(self, action):
         """Обрабатывает Daily Standup."""
