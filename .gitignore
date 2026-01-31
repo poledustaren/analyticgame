@@ -10,3 +10,9 @@ __pycache__/
 # OS-specific
 .DS_Store
 Thumbs.db
+
+# Gas Town (added by gt)
+.runtime/
+.claude/
+.beads/
+.logs/
