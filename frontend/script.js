@@ -281,15 +281,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const appLayout = document.getElementById('app-layout');
     // Sidebar
     const levelDisplay = document.getElementById('level-display');
-    const levelTitle = document.getElementById('level-title');
+    const levelTitle = document.querySelector('.level-title');
     const resourcePool = document.getElementById('resource-pool');
     const newGameBtn = document.getElementById('new-game-btn');
     const saveGameBtn = document.getElementById('save-game-btn');
-    // Training Elements
-    const trainingSection = document.getElementById('training-section');
-    const trainingStatus = document.getElementById('training-status');
-    const trainBtn = document.getElementById('train-btn');
-    const advanceWeekBtn = document.getElementById('advance-week-btn');
     // Sprint Elements
     const sprintStatus = document.getElementById('sprint-status');
     const sprintBtn = document.getElementById('sprint-btn');
@@ -326,27 +321,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const reviewToRetroBtn = document.getElementById('review-to-retro');
     const retroModal = document.getElementById('retro-modal');
     const retroCompleteBtn = document.getElementById('retro-complete');
-    // Planning Poker Elements
-    const pokerModal = document.getElementById('poker-modal');
-    const pokerClose = document.getElementById('poker-close');
-    const pokerCancel = document.getElementById('poker-cancel');
-    const pokerConfirm = document.getElementById('poker-confirm');
-    const pokerTaskTitle = document.getElementById('poker-task-title');
-    const pokerTaskDesc = document.getElementById('poker-task-desc');
-    const pokerTeamEstimates = document.getElementById('poker-team-estimates');
-    const pokerConsensus = document.getElementById('poker-consensus');
-    const pokerFinalValue = document.getElementById('poker-final-value');
-    const pokerMessage = document.getElementById('poker-message');
-
-    // Event Modal Elements
-    const eventModal = document.getElementById('event-modal');
-    const eventTitle = document.getElementById('event-title');
-    const eventDescription = document.getElementById('event-description');
-    const eventIcon = document.getElementById('event-icon');
-    const eventTypeBadge = document.getElementById('event-type-badge');
-    const eventSeverityBadge = document.getElementById('event-severity-badge');
-    const eventChoices = document.getElementById('event-choices');
     // Progress Indicators
+    const levelProgressBar = document.getElementById('level-progress-bar');
+    const levelProgressText = document.getElementById('level-progress-text');
     const achievementsContainer = document.getElementById('achievements-container');
     const toastContainer = document.getElementById('toast-container');
 
@@ -426,233 +403,52 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Level Progress Rendering ---
     function renderLevelProgress(state) {
-        // Update level display and title
-        levelDisplay.textContent = state.level;
+        // Determine level goal based on level
+        let current = 0;
+        let goal = 3;
+        let goalText = 'unplanned tasks';
 
-        const titles = {
-            1: 'The Stabilizer',
-            2: 'The Visualizer',
-            3: 'The Feedback Loop',
-            4: 'The Teacher',
-            5: 'The Experimenter',
-            6: 'The Master'
-        };
-        levelTitle.textContent = titles[state.level] || `Level ${state.level}`;
-
-        // Render level goals
-        renderLevelGoals(state);
-
-        // Check for level complete
-        if (state.level_complete) {
-            showLevelCompleteModal(state.level_complete);
-        }
-    }
-
-    function renderLevelGoals(state) {
-        const goalsList = document.getElementById('level-goals-list');
-        if (!goalsList) return;
-
-        const goals = state.level_goals || [];
-
-        if (goals.length === 0) {
-            goalsList.innerHTML = '<p class="no-goals">No active goals</p>';
-            return;
-        }
-
-        goalsList.innerHTML = goals.map(goal => {
-            const percentage = Math.min(100, Math.round((goal.current / goal.target) * 100));
-            const isComplete = goal.completed;
-
-            return `
-                <div class="level-goal-item ${isComplete ? 'completed' : ''}">
-                    <span class="level-goal-icon">${goal.icon}</span>
-                    <div class="level-goal-content">
-                        <div class="level-goal-description">${goal.description}</div>
-                        <div class="level-goal-progress">
-                            <div class="level-goal-bar">
-                                <div class="level-goal-bar-fill" style="width: ${percentage}%"></div>
-                            </div>
-                            <span class="level-goal-text">${goal.current}/${goal.target}</span>
-                        </div>
-                    </div>
-                    <div class="level-goal-check">${isComplete ? '✓' : ''}</div>
-                </div>
-            `;
-        }).join('');
-    }
-
-    function showLevelCompleteModal(levelComplete) {
-        const modal = document.getElementById('level-complete-modal');
-        if (!modal) return;
-
-        document.getElementById('level-complete-title').textContent = `Level ${levelComplete.level} Complete!`;
-        document.getElementById('level-complete-week').textContent = levelComplete.stats.week;
-        document.getElementById('level-complete-stability').textContent = `${levelComplete.stats.stability}%`;
-        document.getElementById('level-complete-tasks').textContent = levelComplete.stats.tasks_done;
-
-        const goalsList = document.getElementById('level-complete-goals-list');
-        goalsList.innerHTML = levelComplete.stats.goals.map(g => `<li>${g}</li>`).join('');
-
-        SoundSystem.play('levelUp');
-        modal.style.display = 'flex';
-    }
-
-    async function handleLevelCompleteAdvance() {
-        const modal = document.getElementById('level-complete-modal');
-        modal.style.display = 'none';
-
-        await sendAction({ type: 'level_complete_advance' });
-    }
-
-    // --- CI/CD Pipeline Handlers (Level 3+) ---
-    async function handlePipelineCreate() {
-        SoundSystem.play('modalOpen');
-        const newState = await sendAction({ type: 'pipeline_create' });
-        if (newState) {
-            Toast.success('Pipeline Created', 'CI/CD pipeline is ready to configure!', 3000);
-        }
-    }
-
-    async function handlePipelineStart() {
-        SoundSystem.play('sprintStart');
-        const newState = await sendAction({ type: 'pipeline_start' });
-        if (newState) {
-            Toast.info('Pipeline Started', 'Build process initiated...', 2000);
-        }
-    }
-
-    async function handlePipelineAdvance() {
-        SoundSystem.play('taskComplete');
-        const newState = await sendAction({ type: 'pipeline_advance' });
-        if (newState && newState.cicd_pipeline && !newState.cicd_pipeline.current_stage) {
-            Toast.success('Pipeline Complete!', 'All stages passed successfully!', 4000);
-            SoundSystem.play('levelUp');
-        }
-    }
-
-    async function handlePipelineReset() {
-        const newState = await sendAction({ type: 'pipeline_reset' });
-        if (newState) {
-            Toast.info('Pipeline Reset', 'Ready for a new run...', 2000);
-        }
-    }
-
-    async function handlePipelineAutomate() {
-        const newState = await sendAction({ type: 'pipeline_automate' });
-        if (newState && newState.cicd_pipeline && newState.cicd_pipeline.is_automated) {
-            Toast.success('Automation Enabled!', 'Pipeline is now fully automated!', 4000);
-            SoundSystem.play('levelUp');
-        } else if (newState && newState.error) {
-            Toast.error('Insufficient Budget', newState.error, 4000);
-        }
-    }
-
-    function renderPipeline(state) {
-        const cicdSection = document.getElementById('cicd-section');
-        const pipelineCreateBtn = document.getElementById('pipeline-create-btn');
-        const pipelineStartBtn = document.getElementById('pipeline-start-btn');
-        const pipelineAdvanceBtn = document.getElementById('pipeline-advance-btn');
-        const pipelineResetBtn = document.getElementById('pipeline-reset-btn');
-        const pipelineAutomateBtn = document.getElementById('pipeline-automate-btn');
-        const pipelineContainer = document.getElementById('pipeline-container');
-        const pipelineStages = document.getElementById('pipeline-stages');
-        const pipelineStats = document.getElementById('pipeline-stats');
-
-        // Show CI/CD section only from Level 3
-        if (state.level >= 3) {
-            cicdSection.style.display = 'block';
+        if (state.level === 1) {
+            // Level 1: Complete 3 unplanned tasks
+            const doneTasks = state.tasks?.done || [];
+            current = doneTasks.filter(t => t.type === 'unplanned').length;
+            goal = 3;
+            goalText = 'unplanned tasks';
+        } else if (state.level === 2) {
+            // Level 2: Achieve 80% stability
+            current = Math.round(state.stability);
+            goal = 80;
+            goalText = 'stability';
         } else {
-            cicdSection.style.display = 'none';
-            return;
+            // Generic: show sprint completion progress
+            const velocityHistory = state.velocity_history || [];
+            current = velocityHistory.length;
+            goal = 5;
+            goalText = 'sprints completed';
         }
 
-        const pipeline = state.cicd_pipeline;
+        // Calculate percentage
+        const percentage = Math.min(100, Math.round((current / goal) * 100));
 
-        if (!pipeline) {
-            // No pipeline created yet
-            pipelineCreateBtn.style.display = 'inline-block';
-            pipelineStartBtn.style.display = 'none';
-            pipelineAdvanceBtn.style.display = 'none';
-            pipelineResetBtn.style.display = 'none';
-            pipelineAutomateBtn.style.display = 'none';
-            pipelineContainer.style.display = 'block';
-            pipelineContainer.innerHTML = '<div class="pipeline-empty">Create a pipeline to visualize your deployment process (Level 3+)</div>';
-            pipelineStages.style.display = 'none';
-            pipelineStats.style.display = 'none';
+        // Update progress bar
+        levelProgressBar.style.width = `${percentage}%`;
+        levelProgressText.textContent = `${current}/${goal}`;
+
+        // Color coding based on progress
+        if (percentage >= 100) {
+            levelProgressBar.style.background = 'var(--accent-success)';
+        } else if (percentage >= 50) {
+            levelProgressBar.style.background = 'linear-gradient(90deg, var(--accent-primary), var(--accent-success))';
         } else {
-            // Pipeline exists
-            pipelineCreateBtn.style.display = 'none';
-            pipelineStartBtn.style.display = 'inline-block';
-            pipelineAdvanceBtn.style.display = 'inline-block';
-            pipelineResetBtn.style.display = 'inline-block';
-            pipelineAutomateBtn.style.display = pipeline.is_automated ? 'none' : 'inline-block';
-            pipelineContainer.style.display = 'none';
-            pipelineStages.style.display = 'flex';
-            pipelineStats.style.display = 'flex';
-
-            // Update coverage bar
-            const coverage = pipeline.coverage || state.cicd_coverage || 0;
-            document.getElementById('cicd-coverage-bar').style.width = `${coverage}%`;
-            document.getElementById('cicd-coverage-text').textContent = `${coverage}%`;
-
-            // Update stats
-            document.getElementById('pipeline-runs').textContent = pipeline.total_runs || 0;
-            document.getElementById('pipeline-success').textContent = pipeline.successful_runs || 0;
-            document.getElementById('pipeline-failed').textContent = pipeline.failed_runs || 0;
-
-            // Render stages
-            const stages = ['build', 'test', 'deploy_staging', 'deploy_prod', 'monitor'];
-            const stageElements = pipelineStages.querySelectorAll('.pipeline-stage');
-            const arrows = pipelineStages.querySelectorAll('.pipeline-arrow');
-
-            let foundCurrent = false;
-            stageElements.forEach((stageEl, index) => {
-                const stageName = stageEl.dataset.stage;
-                const stageData = pipeline.stages[stageName];
-
-                stageEl.classList.remove('active', 'success', 'failed', 'pending');
-
-                if (stageData) {
-                    if (stageData.status === 'running') {
-                        stageEl.classList.add('active');
-                        foundCurrent = true;
-                    } else if (stageData.status === 'success') {
-                        stageEl.classList.add('success');
-                    } else if (stageData.status === 'failed') {
-                        stageEl.classList.add('failed');
-                    } else {
-                        stageEl.classList.add('pending');
-                    }
-                }
-            });
-
-            // Update arrows
-            arrows.forEach((arrow, index) => {
-                arrow.classList.remove('active', 'success');
-                if (index < stageElements.length - 1) {
-                    const currentStage = stageElements[index];
-                    if (currentStage.classList.contains('success')) {
-                        arrow.classList.add('success');
-                    } else if (currentStage.classList.contains('active')) {
-                        arrow.classList.add('active');
-                    }
-                }
-            });
+            levelProgressBar.style.background = 'linear-gradient(90deg, var(--accent-warning), var(--accent-primary))';
         }
     }
 
     // --- Initialization ---
     function init() {
-        // Initialize Save/Load Modal
-        initSaveLoadModal();
-
         // Attach Event Listeners
         newGameBtn.onclick = startNewGame;
         saveGameBtn.onclick = handleSaveGame;
-
-        // Training Event Listeners
-        trainBtn.onclick = handleTrainDeveloper;
-        advanceWeekBtn.onclick = handleAdvanceWeek;
 
         // Sprint Event Listeners
         sprintBtn.onclick = handleSprintButtonClick;
@@ -663,23 +459,6 @@ document.addEventListener('DOMContentLoaded', () => {
         planningConfirm.onclick = createSprint;
         reviewToRetroBtn.onclick = goToRetro;
         retroCompleteBtn.onclick = completeRetro;
-
-        // CI/CD Pipeline Event Listeners (Level 3+)
-        const pipelineCreateBtn = document.getElementById('pipeline-create-btn');
-        const pipelineStartBtn = document.getElementById('pipeline-start-btn');
-        const pipelineAdvanceBtn = document.getElementById('pipeline-advance-btn');
-        const pipelineResetBtn = document.getElementById('pipeline-reset-btn');
-        const pipelineAutomateBtn = document.getElementById('pipeline-automate-btn');
-
-        if (pipelineCreateBtn) pipelineCreateBtn.onclick = handlePipelineCreate;
-        if (pipelineStartBtn) pipelineStartBtn.onclick = handlePipelineStart;
-        if (pipelineAdvanceBtn) pipelineAdvanceBtn.onclick = handlePipelineAdvance;
-        if (pipelineResetBtn) pipelineResetBtn.onclick = handlePipelineReset;
-        if (pipelineAutomateBtn) pipelineAutomateBtn.onclick = handlePipelineAutomate;
-
-        // Level Complete Modal
-        const levelCompleteAdvanceBtn = document.getElementById('level-complete-advance');
-        if (levelCompleteAdvanceBtn) levelCompleteAdvanceBtn.onclick = handleLevelCompleteAdvance;
 
         tabBtns.forEach(btn => {
             btn.addEventListener('click', () => {
@@ -695,14 +474,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Auto-start new game
         startNewGame();
-    }
-
-    async function handleTrainDeveloper() {
-        await sendAction({ type: 'train_developer' });
-    }
-
-    async function handleAdvanceWeek() {
-        await sendAction({ type: 'advance_week' });
     }
 
     async function startNewGame() {
@@ -747,240 +518,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function handleSaveGame() {
-        openSaveLoadModal('save');
-    }
-
-    // --- Save/Load Modal Functions ---
-    let saveloadModal = null;
-    let saveloadCloseBtn = null;
-    let saveloadCancelBtn = null;
-    let saveloadConfirmBtn = null;
-    let saveloadTabBtns = null;
-    let saveloadTabContents = null;
-    let selectedSaveSlot = null;
-    let currentSaveloadMode = 'save'; // 'save' or 'load'
-    let availableSaves = [];
-
-    function initSaveLoadModal() {
-        saveloadModal = document.getElementById('saveload-modal');
-        saveloadCloseBtn = document.getElementById('saveload-close');
-        saveloadCancelBtn = document.getElementById('saveload-cancel');
-        saveloadConfirmBtn = document.getElementById('saveload-confirm');
-        saveloadTabBtns = document.querySelectorAll('.saveload-tab-btn');
-        saveloadTabContents = document.querySelectorAll('.saveload-tab-content');
-
-        // Event listeners
-        saveloadCloseBtn.onclick = closeSaveLoadModal;
-        saveloadCancelBtn.onclick = closeSaveLoadModal;
-        saveloadConfirmBtn.onclick = handleSaveloadConfirm;
-
-        // Tab switching
-        saveloadTabBtns.forEach(btn => {
-            btn.onclick = () => switchSaveloadTab(btn.dataset.tab);
-        });
-    }
-
-    async function openSaveLoadModal(mode = 'save') {
-        currentSaveloadMode = mode;
-        selectedSaveSlot = null;
-
-        // Update UI based on mode
-        saveloadTabBtns.forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.tab === mode);
-        });
-        saveloadTabContents.forEach(content => {
-            content.classList.toggle('active', content.id === `${mode}-tab`);
-        });
-
-        // Update confirm button text
-        saveloadConfirmBtn.textContent = mode === 'save' ? 'Save' : 'Load';
-
-        // Load and display save slots
-        await loadSaveSlots();
-
-        // Clear save name input for save mode
-        if (mode === 'save') {
-            document.getElementById('save-name-input').value = '';
-        }
-
-        saveloadModal.style.display = 'flex';
-    }
-
-    function closeSaveLoadModal() {
-        saveloadModal.style.display = 'none';
-        selectedSaveSlot = null;
-        // Clear selections
-        document.querySelectorAll('.save-slot').forEach(slot => {
-            slot.classList.remove('selected');
-        });
-    }
-
-    function switchSaveloadTab(tab) {
-        currentSaveloadMode = tab;
-        saveloadTabBtns.forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.tab === tab);
-        });
-        saveloadTabContents.forEach(content => {
-            content.classList.toggle('active', content.id === `${tab}-tab`);
-        });
-
-        // Update confirm button
-        saveloadConfirmBtn.textContent = tab === 'save' ? 'Save' : 'Load';
-
-        // Clear selection
-        selectedSaveSlot = null;
-        document.querySelectorAll('.save-slot').forEach(slot => {
-            slot.classList.remove('selected');
-        });
-    }
-
-    async function loadSaveSlots() {
-        try {
-            const response = await fetch(`${API_BASE_URL}/saves`);
-            const data = await response.json();
-            availableSaves = data.saves || [];
-
-            // Render save slots for both save and load tabs
-            renderSaveSlots('save-slots-container', true);
-            renderSaveSlots('load-slots-container', false);
-        } catch (error) {
-            console.error('Failed to load save slots:', error);
-            Toast.error('Error', 'Failed to load save slots', 3000);
-        }
-    }
-
-    function renderSaveSlots(containerId, allowEmpty) {
-        const container = document.getElementById(containerId);
-        container.innerHTML = '';
-
-        // Create 5 save slots
-        for (let i = 1; i <= 5; i++) {
-            const slotId = `slot${i}`;
-            const saveData = availableSaves.find(s => s.slot_id === slotId);
-
-            const slotEl = document.createElement('div');
-            slotEl.className = 'save-slot';
-            slotEl.dataset.slotId = slotId;
-
-            if (saveData) {
-                slotEl.innerHTML = `
-                    <div class="save-slot-id">Slot ${i}</div>
-                    <div class="save-slot-name">${escapeHtml(saveData.name || 'Untitled')}</div>
-                    <div class="save-slot-info">
-                        <div><span>Week:</span> <span>${saveData.week || 1}</span></div>
-                        <div><span>Level:</span> <span>${saveData.level || 1}</span></div>
-                        <div><span>Date:</span> <span>${formatDate(saveData.saved_at)}</span></div>
-                    </div>
-                `;
-            } else {
-                slotEl.classList.add('empty');
-                slotEl.innerHTML = `
-                    <div class="save-slot-id">Slot ${i}</div>
-                    <div class="save-slot-name">Empty Slot</div>
-                `;
-            }
-
-            // Click handler
-            slotEl.onclick = () => selectSaveSlot(slotId, containerId);
-
-            container.appendChild(slotEl);
-        }
-    }
-
-    function selectSaveSlot(slotId, containerId) {
-        selectedSaveSlot = slotId;
-
-        // Clear all selections in both containers
-        document.querySelectorAll('.save-slot').forEach(slot => {
-            slot.classList.remove('selected');
-        });
-
-        // Select clicked slot
-        const slotEl = document.querySelector(`.save-slot[data-slot-id="${slotId}"]`);
-        if (slotEl) {
-            slotEl.classList.add('selected');
-        }
-    }
-
-    async function handleSaveloadConfirm() {
-        if (!selectedSaveSlot) {
-            Toast.error('No Slot Selected', 'Please select a save slot', 2000);
-            return;
-        }
-
-        if (currentSaveloadMode === 'save') {
-            await saveGame(selectedSaveSlot);
-        } else {
-            await loadGame(selectedSaveSlot);
-        }
-    }
-
-    async function saveGame(slotId) {
-        const saveName = document.getElementById('save-name-input').value.trim();
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/save_game`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    slot_id: slotId,
-                    name: saveName || null
-                })
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                Toast.success('Game Saved!', `Saved to ${slotId}`, 2000);
-                closeSaveLoadModal();
-            } else {
-                Toast.error('Save Failed', data.error || 'Could not save game', 3000);
-            }
-        } catch (error) {
-            console.error('Save error:', error);
-            Toast.error('Save Failed', 'Could not communicate with server', 3000);
-        }
-    }
-
-    async function loadGame(slotId) {
-        try {
-            const response = await fetch(`${API_BASE_URL}/load_game`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ slot_id: slotId })
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                currentState = data.state;
-                render(currentState);
-                Toast.success('Game Loaded!', `Loaded from ${slotId}`, 2000);
-                closeSaveLoadModal();
-            } else {
-                Toast.error('Load Failed', data.error || 'Could not load game', 3000);
-            }
-        } catch (error) {
-            console.error('Load error:', error);
-            Toast.error('Load Failed', 'Could not communicate with server', 3000);
-        }
-    }
-
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    function formatDate(isoString) {
-        if (!isoString) return 'Unknown';
-        const date = new Date(isoString);
-        return date.toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+        alert("Save functionality placeholder.");
     }
 
     // --- Rendering Logic ---
@@ -1043,48 +581,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // 5. Logs
         renderLogs(state.mentor_log, state.chat_history);
 
-        // 6. Training Section (Level 2+)
-        renderTraining(state);
-
-        // 7. Velocity Chart
+        // 6. Velocity Chart
         renderVelocity(state.velocity_history || []);
 
-        // 7. CI/CD Pipeline (Level 3+)
-        renderPipeline(state);
-
-        // 8. Achievements
+        // 7. Achievements
         renderAchievements(state);
-
-        // 8. Check for pending events
-        checkForPendingEvent(state);
-    }
-
-    function renderTraining(state) {
-        // Show training section only in Level 2+
-        if (state.level >= 2) {
-            trainingSection.style.display = 'block';
-        } else {
-            trainingSection.style.display = 'none';
-            return;
-        }
-
-        // Update training status
-        if (state.training_in_progress) {
-            const weeks = state.training_in_progress.weeks_remaining;
-            trainingStatus.innerHTML = `
-                <p class="training-active">Брент обучает стажера...</p>
-                <p class="training-countdown">${weeks} недель(и) осталось</p>
-            `;
-            trainBtn.disabled = true;
-            trainBtn.textContent = 'Training in Progress...';
-        } else {
-            trainingStatus.innerHTML = `
-                <p class="training-idle">Брент может обучить новых разработчиков.</p>
-                <p class="training-hint">Обучение займет 3 недели, но снизит зависимость от Брента.</p>
-            `;
-            trainBtn.disabled = false;
-            trainBtn.textContent = 'Train Developer (3 weeks)';
-        }
     }
 
     // --- Sprint Rendering ---
@@ -1267,32 +768,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
-                // Check if task is in current sprint
-                const isInSprint = currentState?.current_sprint?.task_ids?.includes(task.id);
-                const sprintBadge = isInSprint ? '<span class="sprint-task-badge">SPRINT</span>' : '';
-
                 card.innerHTML = `
-                    ${sprintBadge}
                     <h4>${task.title}</h4>
                     <p style="font-size:11px; color:#ccc;">${task.description || ''}</p>
                     <div class="task-meta">
                         <span>${task.points} pts</span>
                         ${resourceSlotHtml}
                     </div>
-                    <button class="task-poker-btn" data-task-id="${task.id}">Re-estimate</button>
                 `;
 
                 if (isResourceNeeded && !assignedResId) {
                     card.classList.add('resource-drop-target');
-                }
-
-                // Add Planning Poker button handler
-                const pokerBtn = card.querySelector('.task-poker-btn');
-                if (pokerBtn) {
-                    pokerBtn.onclick = (e) => {
-                        e.stopPropagation(); // Prevent drag start
-                        openPlanningPoker(task);
-                    };
                 }
 
                 colList.appendChild(card);
@@ -1367,25 +853,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             showToast('WIP Limit Reached!', `Maximum ${wipLimit} tasks allowed in progress.`, 'warning', 4000);
                             return;
                         }
-                    }
-
-                    // Sprint validation: cannot move non-sprint task to in_progress during active sprint
-                    if (newColId === 'in_progress' && currentState?.current_sprint) {
-                        const sprintPhase = currentState.current_sprint.phase;
-                        const sprintTaskIds = currentState.current_sprint.task_ids || [];
-
-                        // Only block during ACTIVE phase, not PLANNING
-                        if (sprintPhase === 'active' && !sprintTaskIds.includes(taskId)) {
-                            SoundSystem.play('error');
-                            Toast.error('Sprint in Progress', 'Only sprint tasks can be moved to In Progress during active sprint!', 4000);
-                            return;
-                        }
-                    }
-
-                    // Warning when moving task from done back
-                    if (oldColId === 'done' && newColId !== 'done') {
-                        SoundSystem.play('wipWarning');
-                        Toast.warning('Moving from Done', 'Task is being moved back from Done. Is this a hotfix?', 3000);
                     }
 
                     // Optimization: Don't send request if dropping in same column
@@ -1645,674 +1112,6 @@ document.addEventListener('DOMContentLoaded', () => {
             notes: notes
         });
     }
-
-    // ============================================
-    // PLANNING POKER FEATURE
-    // ============================================
-
-    // Planning Poker State
-    let currentPokerTask = null;
-    let selectedPokerValue = null;
-    let teamEstimates = [];
-
-    // Team members for simulation
-    const teamMembers = [
-        { id: 'dev1', name: 'Alex', role: 'Senior Dev', color: '#3b82f6' },
-        { id: 'dev2', name: 'Sam', role: 'Junior Dev', color: '#22c55e' },
-        { id: 'qa1', name: 'Jordan', role: 'QA Engineer', color: '#f59e0b' },
-        { id: 'ba1', name: 'Casey', role: 'Business Analyst', color: '#8b5cf6' }
-    ];
-
-    // Open Planning Poker for a task
-    function openPlanningPoker(task) {
-        if (!task) return;
-
-        currentPokerTask = task;
-        selectedPokerValue = null;
-
-        // Reset UI
-        pokerTaskTitle.textContent = task.title;
-        pokerTaskDesc.textContent = task.description || 'No description';
-        pokerTeamEstimates.innerHTML = '';
-        pokerConsensus.style.display = 'none';
-        pokerConfirm.disabled = true;
-
-        // Render team members with face-down cards
-        teamMembers.forEach(member => {
-            const memberCard = document.createElement('div');
-            memberCard.className = 'team-member-card';
-            memberCard.id = `team-${member.id}`;
-            memberCard.innerHTML = `
-                <div class="team-member-avatar thinking">${member.name[0]}</div>
-                <div class="team-member-estimate face-down"></div>
-                <span class="team-member-name">${member.name}</span>
-            `;
-            pokerTeamEstimates.appendChild(memberCard);
-        });
-
-        // Reset player card selection
-        document.querySelectorAll('.poker-card').forEach(card => {
-            card.classList.remove('selected');
-        });
-
-        SoundSystem.play('modalOpen');
-        pokerModal.style.display = 'flex';
-
-        // Simulate team voting after a delay
-        setTimeout(() => simulateTeamVoting(task), 1500);
-    }
-
-    // Simulate team members voting
-    function simulateTeamVoting(task) {
-        teamEstimates = [];
-
-        // Generate semi-realistic estimates based on task points
-        const baseEstimate = task.points || 3;
-        const fibonacci = [0, 1, 2, 3, 5, 8, 13, 21];
-
-        teamMembers.forEach((member, index) => {
-            setTimeout(() => {
-                // Simulate estimate with some variance
-                let estimate;
-                if (member.role === 'Senior Dev') {
-                    // More accurate, closer to actual
-                    estimate = baseEstimate;
-                } else if (member.role === 'Junior Dev') {
-                    // Tends to underestimate
-                    estimate = Math.max(1, baseEstimate - 1);
-                } else if (member.role === 'QA Engineer') {
-                    // Accounts for testing, tends to be higher
-                    estimate = Math.min(21, baseEstimate + 2);
-                } else {
-                    // Business analyst, moderate estimate
-                    estimate = baseEstimate;
-                }
-
-                // Ensure it's a Fibonacci number
-                if (!fibonacci.includes(estimate)) {
-                    estimate = fibonacci[Math.min(fibonacci.indexOf(baseEstimate) + 1, fibonacci.length - 1)];
-                }
-
-                teamEstimates.push({ memberId: member.id, value: estimate });
-
-                // Reveal the card
-                revealTeamCard(member.id, estimate);
-
-                // Check if all have voted
-                if (teamEstimates.length === teamMembers.length) {
-                    setTimeout(() => showConsensus(), 500);
-                }
-            }, index * 600 + Math.random() * 400);
-        });
-    }
-
-    // Reveal a team member's card
-    function revealTeamCard(memberId, value) {
-        const memberCard = document.getElementById(`team-${memberId}`);
-        if (!memberCard) return;
-
-        const avatar = memberCard.querySelector('.team-member-avatar');
-        const estimateCard = memberCard.querySelector('.team-member-estimate');
-
-        avatar.classList.remove('thinking');
-        estimateCard.classList.remove('face-down');
-        estimateCard.classList.add('face-up');
-        estimateCard.textContent = value;
-    }
-
-    // Show consensus result
-    function showConsensus() {
-        if (teamEstimates.length === 0) return;
-
-        // Calculate consensus (average, rounded to nearest Fibonacci)
-        const values = teamEstimates.map(e => e.value);
-        const avg = values.reduce((a, b) => a + b, 0) / values.length;
-        const fibonacci = [0, 1, 2, 3, 5, 8, 13, 21];
-
-        // Find nearest Fibonacci number
-        let consensus = fibonacci.reduce((prev, curr) =>
-            Math.abs(curr - avg) < Math.abs(prev - avg) ? curr : prev
-        );
-
-        // Check for agreement
-        const uniqueValues = [...new Set(values)];
-        const hasAgreement = uniqueValues.length <= 2 &&
-            Math.max(...uniqueValues) - Math.min(...uniqueValues) <= 2;
-
-        pokerFinalValue.textContent = consensus;
-
-        if (hasAgreement) {
-            pokerMessage.textContent = 'Team reached agreement! Great discussion.';
-        } else if (uniqueValues.length > 3) {
-            pokerMessage.textContent = 'Wide spread of estimates. Consider discussing the complexity.';
-        } else {
-            pokerMessage.textContent = 'Close estimates. Minor discussion recommended.';
-        }
-
-        pokerConsensus.style.display = 'block';
-        SoundSystem.play('success');
-    }
-
-    // Close Planning Poker modal
-    function closePlanningPoker() {
-        SoundSystem.play('modalClose');
-        pokerModal.style.display = 'none';
-        currentPokerTask = null;
-        selectedPokerValue = null;
-        teamEstimates = [];
-    }
-
-    // Apply the agreed estimate to the task
-    async function applyPokerEstimate() {
-        if (!currentPokerTask) return;
-
-        const finalValue = pokerFinalValue.textContent;
-        const numValue = parseInt(finalValue) || 0;
-
-        SoundSystem.play('success');
-        Toast.success('Estimate Applied', `"${currentPokerTask.title}" estimated at ${numValue} points`, 3000);
-
-        await sendAction({
-            type: 'poker_estimate',
-            task_id: currentPokerTask.id,
-            estimate: numValue
-        });
-
-        closePlanningPoker();
-    }
-
-    // Planning Poker Event Handlers
-    pokerClose.onclick = closePlanningPoker;
-    pokerCancel.onclick = closePlanningPoker;
-    pokerConfirm.onclick = applyPokerEstimate;
-
-    // Card selection handlers
-    document.querySelectorAll('.poker-card').forEach(card => {
-        card.onclick = () => {
-            // Remove previous selection
-            document.querySelectorAll('.poker-card').forEach(c => c.classList.remove('selected'));
-
-            // Select this card
-            card.classList.add('selected');
-            selectedPokerValue = card.dataset.value;
-
-            // Enable confirm button
-            pokerConfirm.disabled = false;
-
-            // Play sound
-            SoundSystem.play('taskMove');
-        };
-    });
-
-    // --- Event Modal Functions ---
-
-    function showEventModal(event) {
-        if (!event) return;
-
-        SoundSystem.play('modalOpen');
-
-        // Update modal content
-        eventTitle.textContent = event.title;
-        eventDescription.textContent = event.description;
-        eventIcon.textContent = extractEventIcon(event.title);
-
-        // Update badges
-        eventTypeBadge.textContent = event.type || 'EVENT';
-        eventTypeBadge.setAttribute('data-type', event.type || 'random');
-
-        eventSeverityBadge.textContent = event.severity || 'MEDIUM';
-        eventSeverityBadge.setAttribute('data-severity', (event.severity || 'medium').toLowerCase());
-
-        // Add critical class if severity is critical
-        if (event.severity === 'critical' || event.severity === 'CRITICAL') {
-            eventModal.classList.add('critical');
-        } else {
-            eventModal.classList.remove('critical');
-        }
-
-        // Render choices
-        renderEventChoices(event.choices || []);
-
-        // Show modal
-        eventModal.style.display = 'flex';
-    }
-
-    function extractEventIcon(title) {
-        // Extract emoji from title if present
-        const emojiMatch = title.match(/^([\p{Emoji}\u200d]+)\s/u);
-        if (emojiMatch) return emojiMatch[1];
-
-        // Default icons based on event type keywords
-        const iconMap = {
-            'bug': '🐛',
-            'fire': '🔥',
-            'deployment': '🚀',
-            'requirement': '📝',
-            'deadline': '⏰',
-            'feature': '✨',
-            'team': '👥',
-            'sick': '🤒',
-            'conflict': '😤',
-            'morale': '😔',
-            'vendor': '📦',
-            'security': '🔒',
-            'server': '🖥️',
-            'outage': '🔴',
-            'audit': '📋'
-        };
-
-        const lowerTitle = title.toLowerCase();
-        for (const [keyword, icon] of Object.entries(iconMap)) {
-            if (lowerTitle.includes(keyword)) return icon;
-        }
-
-        return '⚠️'; // Default icon
-    }
-
-    function renderEventChoices(choices) {
-        eventChoices.innerHTML = '';
-
-        choices.forEach((choice, index) => {
-            const choiceEl = document.createElement('div');
-            choiceEl.className = 'event-choice';
-            choiceEl.dataset.choiceId = choice.id;
-
-            // Extract icon from choice text if present
-            const iconMatch = choice.text.match(/^([\p{Emoji}\u200d]+)\s/u);
-            const choiceIcon = iconMatch ? iconMatch[1] : '';
-            const choiceText = iconMatch ? choice.text.substring(2) : choice.text;
-
-            // Build choice HTML
-            let html = `
-                <div class="event-choice-text">
-                    ${choiceIcon ? `<span class="event-choice-icon">${choiceIcon}</span>` : ''}
-                    <span>${choiceText}</span>
-                </div>
-            `;
-
-            // Add consequences if available
-            if (choice.consequences && Object.keys(choice.consequences).length > 0) {
-                html += '<div class="event-choice-consequences">';
-
-                for (const [key, value] of Object.entries(choice.consequences)) {
-                    const consequenceClass = value > 0 ? 'positive' : value < 0 ? 'negative' : 'neutral';
-                    const sign = value > 0 ? '+' : '';
-                    const label = formatConsequenceKey(key);
-
-                    html += `<span class="event-consequence ${consequenceClass}">${label}: ${sign}${value}</span>`;
-                }
-
-                html += '</div>';
-            }
-
-            choiceEl.innerHTML = html;
-
-            // Add click handler
-            choiceEl.onclick = () => handleEventChoice(choice.id, choiceEl);
-
-            eventChoices.appendChild(choiceEl);
-        });
-    }
-
-    function formatConsequenceKey(key) {
-        const labels = {
-            'budget': '💰 Budget',
-            'stability': '📊 Stability',
-            'unplanned_work': '🔥 Unplanned',
-            'morale': '😊 Morale',
-            'wip_limit': '📏 WIP Limit',
-            'knowledge': '📚 Knowledge'
-        };
-        return labels[key] || key;
-    }
-
-    async function handleEventChoice(choiceId, choiceEl) {
-        // Add selecting animation
-        choiceEl.classList.add('selecting');
-
-        // Disable all choices to prevent multiple selections
-        eventChoices.querySelectorAll('.event-choice').forEach(el => {
-            el.style.pointerEvents = 'none';
-            el.style.opacity = el === choiceEl ? '1' : '0.5';
-        });
-
-        SoundSystem.play('success');
-
-        // Send choice to backend
-        const newState = await sendAction({
-            type: 'event_choice',
-            choice_id: choiceId
-        });
-
-        // Close modal after a short delay to show the selection
-        setTimeout(() => {
-            SoundSystem.play('modalClose');
-            eventModal.style.display = 'none';
-
-            // Reset choice styles
-            eventChoices.querySelectorAll('.event-choice').forEach(el => {
-                el.style.pointerEvents = '';
-                el.style.opacity = '';
-                el.classList.remove('selecting');
-            });
-        }, 300);
-    }
-
-    function closeEventModal() {
-        SoundSystem.play('modalClose');
-        eventModal.style.display = 'none';
-    }
-
-    // Check for pending events in state
-    function checkForPendingEvent(state) {
-        if (state.pending_event) {
-            // Small delay to ensure render completes first
-            setTimeout(() => {
-                showEventModal(state.pending_event);
-            }, 100);
-            return true;
-        }
-        return false;
-    }
-
-    // ============================================
-    // QUIZ SYSTEM
-    // ============================================
-
-    const Quiz = {
-        modal: document.getElementById('quiz-modal'),
-        closeBtn: document.getElementById('quiz-close'),
-        toggleBtn: document.getElementById('quiz-toggle-btn'),
-        startBtn: document.getElementById('quiz-start-btn'),
-        cancelBtn: document.getElementById('quiz-cancel'),
-        nextBtn: document.getElementById('quiz-next-question'),
-
-        // Screens
-        startScreen: document.getElementById('quiz-start-screen'),
-        questionScreen: document.getElementById('quiz-question-screen'),
-        resultScreen: document.getElementById('quiz-result-screen'),
-        explanation: document.getElementById('quiz-explanation'),
-
-        // Elements
-        questionText: document.getElementById('quiz-question-text'),
-        optionsContainer: document.getElementById('quiz-options-container'),
-        currentNum: document.getElementById('quiz-current-num'),
-        totalNum: document.getElementById('quiz-total-num'),
-        scoreDisplay: document.getElementById('quiz-score'),
-        totalDisplay: document.getElementById('quiz-total'),
-        modalFooter: document.getElementById('quiz-modal-footer'),
-
-        // Result elements
-        resultIcon: document.getElementById('quiz-result-icon'),
-        resultTitle: document.getElementById('quiz-result-title'),
-        resultText: document.getElementById('quiz-result-text'),
-        explanationIcon: document.getElementById('explanation-icon'),
-        explanationTitle: document.getElementById('explanation-title'),
-        explanationText: document.getElementById('explanation-text'),
-
-        // State
-        currentQuestion: null,
-        selectedOption: null,
-        totalQuestions: 8,
-
-        init() {
-            // Toggle button
-            this.toggleBtn.addEventListener('click', () => this.openModal());
-
-            // Close button
-            this.closeBtn.addEventListener('click', () => this.closeModal());
-
-            // Cancel button
-            this.cancelBtn.addEventListener('click', () => this.closeModal());
-
-            // Start button
-            this.startBtn.addEventListener('click', () => this.startQuiz());
-
-            // Next question button
-            this.nextBtn.addEventListener('click', () => this.nextQuestion());
-
-            // Close on overlay click
-            this.modal.addEventListener('click', (e) => {
-                if (e.target === this.modal) {
-                    // Only allow closing if not in active question
-                    if (this.startScreen.style.display !== 'none') {
-                        this.closeModal();
-                    }
-                }
-            });
-        },
-
-        openModal() {
-            this.resetScreens();
-            this.modal.style.display = 'flex';
-            this.modalFooter.style.display = 'flex';
-            SoundSystem.play('modalOpen');
-        },
-
-        closeModal() {
-            this.modal.style.display = 'none';
-            SoundSystem.play('modalClose');
-        },
-
-        resetScreens() {
-            this.startScreen.style.display = 'block';
-            this.questionScreen.style.display = 'none';
-            this.resultScreen.style.display = 'none';
-            this.explanation.style.display = 'none';
-            this.startBtn.style.display = 'inline-block';
-            this.cancelBtn.style.display = 'inline-block';
-        },
-
-        async startQuiz() {
-            this.startBtn.style.display = 'none';
-            await this.startQuestion();
-        },
-
-        async startQuestion() {
-            try {
-                const response = await fetch(`${API_BASE_URL}/action`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ type: 'quiz_start' })
-                });
-                const result = await response.json();
-
-                if (result.quiz?.current_question) {
-                    this.showQuestion(result.quiz);
-                } else if (result.quiz?.remaining === 0) {
-                    this.showResults(result.quiz);
-                } else {
-                    // No more questions or quiz not available
-                    this.showResults(result.quiz || { score: 0, total_answered: 0 });
-                }
-            } catch (error) {
-                console.error('Failed to start quiz question:', error);
-                SoundSystem.play('error');
-                Toast.error('Quiz Error', 'Could not load question', 3000);
-            }
-        },
-
-        showQuestion(quizData) {
-            const question = quizData.current_question;
-            this.currentQuestion = question;
-            this.selectedOption = null;
-
-            // Update progress
-            this.currentNum.textContent = quizData.total_answered + 1;
-            this.totalNum.textContent = this.totalQuestions;
-            this.scoreDisplay.textContent = quizData.score;
-            this.totalDisplay.textContent = quizData.total_answered;
-
-            // Show question screen
-            this.startScreen.style.display = 'none';
-            this.resultScreen.style.display = 'none';
-            this.explanation.style.display = 'none';
-            this.questionScreen.style.display = 'block';
-
-            // Set question text
-            this.questionText.textContent = question.question;
-
-            // Render options
-            this.optionsContainer.innerHTML = '';
-            question.options.forEach((option, index) => {
-                const optionEl = document.createElement('button');
-                optionEl.className = 'quiz-option';
-                optionEl.innerHTML = `<span class="quiz-option-letter">${String.fromCharCode(65 + index)}</span>${option}`;
-                optionEl.addEventListener('click', () => this.selectOption(index, optionEl));
-                this.optionsContainer.appendChild(optionEl);
-            });
-
-            // Hide footer during question
-            this.modalFooter.style.display = 'none';
-        },
-
-        selectOption(index, element) {
-            if (element.classList.contains('disabled')) return;
-
-            // Remove previous selection
-            document.querySelectorAll('.quiz-option').forEach(opt => {
-                opt.classList.remove('selected');
-            });
-
-            // Add selection to clicked option
-            element.classList.add('selected');
-            this.selectedOption = index;
-
-            // Submit answer after a short delay
-            setTimeout(() => this.submitAnswer(), 200);
-        },
-
-        async submitAnswer() {
-            if (this.selectedOption === null) return;
-
-            // Disable all options
-            document.querySelectorAll('.quiz-option').forEach(opt => {
-                opt.classList.add('disabled');
-            });
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/action`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        type: 'quiz_submit_answer',
-                        answer_index: this.selectedOption
-                    })
-                });
-                const result = await response.json();
-
-                this.showExplanation(result);
-            } catch (error) {
-                console.error('Failed to submit answer:', error);
-                SoundSystem.play('error');
-                Toast.error('Quiz Error', 'Could not submit answer', 3000);
-            }
-        },
-
-        showExplanation(result) {
-            const answerResult = result.quiz?.last_answer_result;
-            const question = answerResult?.question || this.currentQuestion;
-            const isCorrect = answerResult?.is_correct ?? false;
-            const explanation = answerResult?.explanation || '';
-            const correctAnswer = answerResult?.correct_answer ?? 0;
-            const score = result.quiz?.score ?? 0;
-            const total = result.quiz?.total_answered ?? 0;
-
-            // Update options to show correct/incorrect
-            const options = document.querySelectorAll('.quiz-option');
-            options.forEach((opt, index) => {
-                opt.classList.remove('selected');
-                if (index === this.selectedOption) {
-                    opt.classList.add(isCorrect ? 'correct' : 'incorrect');
-                } else if (index === correctAnswer) {
-                    opt.classList.add('correct');
-                }
-            });
-
-            // Show explanation
-            this.questionScreen.style.display = 'none';
-            this.explanation.style.display = 'block';
-            this.explanation.className = 'quiz-explanation ' + (isCorrect ? 'correct' : 'incorrect');
-
-            this.explanationIcon.textContent = isCorrect ? '✅' : '❌';
-            this.explanationTitle.textContent = isCorrect ? 'Правильно!' : 'Неправильно!';
-            this.explanationText.textContent = explanation;
-
-            // Update score display
-            this.scoreDisplay.textContent = score;
-            this.totalDisplay.textContent = total;
-
-            // Play sound
-            SoundSystem.play(isCorrect ? 'success' : 'error');
-
-            // Check if quiz is complete
-            if (result.quiz?.remaining === 0) {
-                this.nextBtn.textContent = 'Завершить викторину';
-            } else {
-                this.nextBtn.textContent = 'Следующий вопрос';
-            }
-        },
-
-        async nextQuestion() {
-            if (this.nextBtn.textContent === 'Завершить викторину') {
-                // Show final results
-                const score = this.scoreDisplay.textContent;
-                const total = this.totalDisplay.textContent;
-                this.showFinalResults(parseInt(score), parseInt(total));
-            } else {
-                // Load next question
-                await this.startQuestion();
-            }
-        },
-
-        showFinalResults(score, total) {
-            this.questionScreen.style.display = 'none';
-            this.explanation.style.display = 'none';
-            this.resultScreen.style.display = 'block';
-            this.modalFooter.style.display = 'flex';
-
-            const percentage = Math.round((score / total) * 100);
-            let icon, title;
-
-            if (percentage >= 80) {
-                icon = '🏆';
-                title = 'Превосходно!';
-            } else if (percentage >= 60) {
-                icon = '👍';
-                title = 'Хороший результат!';
-            } else if (percentage >= 40) {
-                icon = '📚';
-                title = 'Есть к чему стремиться';
-            } else {
-                icon = '💪';
-                title = 'Продолжай учиться!';
-            }
-
-            this.resultIcon.textContent = icon;
-            this.resultTitle.textContent = title;
-            this.resultText.textContent = `Ты ответил правильно на ${score} из ${total} вопросов (${percentage}%)`;
-
-            // Update start button for restart
-            this.startBtn.style.display = 'inline-block';
-            this.startBtn.textContent = 'Начать заново';
-
-            if (percentage >= 60) {
-                SoundSystem.play('levelUp');
-            } else {
-                SoundSystem.play('success');
-            }
-
-            Toast.success('Quiz Complete', `Score: ${score}/${total}`, 3000);
-        },
-
-        showResults(quizData) {
-            const score = quizData.score ?? 0;
-            const total = quizData.total_answered ?? 0;
-            this.showFinalResults(score, total);
-        }
-    };
-
-    Quiz.init();
 
     init();
 });

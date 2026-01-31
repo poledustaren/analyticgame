@@ -19,12 +19,15 @@
 
             <div class="sidebar-section">
                 <h3>LEVEL <span id="level-display">1</span></h3>
-                <p class="level-title" id="level-title">The Stabilizer</p>
-                <!-- Level Goals -->
-                <div class="level-goals-container">
-                    <h4 class="goals-title">GOALS</h4>
-                    <div id="level-goals-list" class="level-goals-list">
-                        <!-- Goals will be rendered here -->
+                <p class="level-title">The Stabilizer</p>
+                <!-- Level Progress Bar -->
+                <div class="level-progress-container">
+                    <div class="level-progress-label">
+                        <span>Progress</span>
+                        <span id="level-progress-text">0/3</span>
+                    </div>
+                    <div class="level-progress-bar-bg">
+                        <div class="level-progress-bar-fill" id="level-progress-bar" style="width: 0%;"></div>
                     </div>
                 </div>
             </div>
@@ -51,20 +54,6 @@
                 </div>
             </div>
 
-            <!-- TRAINING SECTION (Level 2+) -->
-            <div class="sidebar-section training-section" id="training-section" style="display: none;">
-                <h3>TRAINING</h3>
-                <div id="training-status">
-                    <p class="training-idle">Брент может обучить новых разработчиков.</p>
-                </div>
-                <button id="train-btn" class="train-btn">Train Developer (3 weeks)</button>
-            </div>
-
-            <!-- WEEK ADVANCE -->
-            <div class="sidebar-section">
-                <button id="advance-week-btn" class="week-btn">Advance Week ➔</button>
-            </div>
-
             <div class="sidebar-section spacer"></div>
 
             <!-- ACHIEVEMENTS SECTION -->
@@ -77,7 +66,7 @@
 
             <div class="sidebar-menu">
                 <button id="new-game-btn" class="menu-btn">Restart Level</button>
-                <button id="save-game-btn" class="menu-btn">Save / Load</button>
+                <button id="save-game-btn" class="menu-btn">Save Progress</button>
             </div>
         </aside>
 
@@ -174,75 +163,6 @@
                 <h3>VELOCITY HISTORY</h3>
                 <div id="velocity-chart" class="velocity-chart">
                     <div class="velocity-empty">Complete sprints to see velocity trend</div>
-                </div>
-            </div>
-
-            <!-- CI/CD Pipeline Section (Level 3+) -->
-            <div id="cicd-section" class="cicd-section" style="display: none;">
-                <div class="cicd-header">
-                    <h3>🚀 CI/CD PIPELINE</h3>
-                    <div class="cicd-controls">
-                        <button id="pipeline-create-btn" class="pipeline-btn create-pipeline">Create Pipeline</button>
-                        <button id="pipeline-start-btn" class="pipeline-btn start-pipeline" style="display: none;">Start Pipeline</button>
-                        <button id="pipeline-advance-btn" class="pipeline-btn advance-pipeline" style="display: none;">Advance Stage</button>
-                        <button id="pipeline-reset-btn" class="pipeline-btn reset-pipeline" style="display: none;">Reset</button>
-                        <button id="pipeline-automate-btn" class="pipeline-btn automate-pipeline" style="display: none;">Automate ($15k)</button>
-                    </div>
-                </div>
-                <div class="cicd-coverage">
-                    <span class="coverage-label">CI/CD Coverage:</span>
-                    <div class="coverage-bar-bg">
-                        <div id="cicd-coverage-bar" class="coverage-bar-fill" style="width: 0%;"></div>
-                    </div>
-                    <span id="cicd-coverage-text" class="coverage-text">0%</span>
-                </div>
-                <div id="pipeline-container" class="pipeline-container">
-                    <div class="pipeline-empty">Create a pipeline to visualize your deployment process (Level 3+)</div>
-                </div>
-                <div id="pipeline-stages" class="pipeline-stages" style="display: none;">
-                    <div class="pipeline-stage" data-stage="build">
-                        <div class="stage-icon">🔨</div>
-                        <div class="stage-name">BUILD</div>
-                        <div class="stage-indicator"></div>
-                    </div>
-                    <div class="pipeline-arrow">→</div>
-                    <div class="pipeline-stage" data-stage="test">
-                        <div class="stage-icon">🧪</div>
-                        <div class="stage-name">TEST</div>
-                        <div class="stage-indicator"></div>
-                    </div>
-                    <div class="pipeline-arrow">→</div>
-                    <div class="pipeline-stage" data-stage="deploy_staging">
-                        <div class="stage-icon">📦</div>
-                        <div class="stage-name">STAGING</div>
-                        <div class="stage-indicator"></div>
-                    </div>
-                    <div class="pipeline-arrow">→</div>
-                    <div class="pipeline-stage" data-stage="deploy_prod">
-                        <div class="stage-icon">🚀</div>
-                        <div class="stage-name">PRODUCTION</div>
-                        <div class="stage-indicator"></div>
-                    </div>
-                    <div class="pipeline-arrow">→</div>
-                    <div class="pipeline-stage" data-stage="monitor">
-                        <div class="stage-icon">📊</div>
-                        <div class="stage-name">MONITOR</div>
-                        <div class="stage-indicator"></div>
-                    </div>
-                </div>
-                <div id="pipeline-stats" class="pipeline-stats" style="display: none;">
-                    <div class="stat-item">
-                        <span class="stat-label">Runs:</span>
-                        <span id="pipeline-runs" class="stat-value">0</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Success:</span>
-                        <span id="pipeline-success" class="stat-value success">0</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Failed:</span>
-                        <span id="pipeline-failed" class="stat-value failed">0</span>
-                    </div>
                 </div>
             </div>
         </main>
@@ -373,221 +293,6 @@
             </div>
         </div>
     </div>
-
-    <!-- PLANNING POKER MODAL -->
-    <div id="poker-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content poker-modal">
-            <div class="modal-header">
-                <h2>🃏 Planning Poker</h2>
-                <button class="modal-close" id="poker-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="poker-task-info">
-                    <h4 id="poker-task-title">Task Title</h4>
-                    <p id="poker-task-desc">Task description goes here...</p>
-                </div>
-
-                <div class="poker-section">
-                    <h4>Team Estimates</h4>
-                    <div id="poker-team-estimates" class="poker-team-estimates">
-                        <!-- Team member cards will appear here -->
-                    </div>
-                </div>
-
-                <div class="poker-section">
-                    <h4>Your Estimate</h4>
-                    <div class="poker-cards-container">
-                        <div class="poker-card" data-value="0">0</div>
-                        <div class="poker-card" data-value="1">1</div>
-                        <div class="poker-card" data-value="2">2</div>
-                        <div class="poker-card" data-value="3">3</div>
-                        <div class="poker-card" data-value="5">5</div>
-                        <div class="poker-card" data-value="8">8</div>
-                        <div class="poker-card" data-value="13">13</div>
-                        <div class="poker-card" data-value="21">21</div>
-                        <div class="poker-card" data-value="?">?</div>
-                    </div>
-                </div>
-
-                <div class="poker-consensus" id="poker-consensus" style="display: none;">
-                    <h4>Consensus</h4>
-                    <div class="consensus-result">
-                        <span class="consensus-label">Agreed Estimate:</span>
-                        <span class="consensus-value" id="poker-final-value">-</span>
-                    </div>
-                    <div class="consensus-message" id="poker-message"></div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="modal-btn secondary" id="poker-cancel">Cancel</button>
-                <button class="modal-btn primary" id="poker-confirm">Apply Estimate</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- SAVE/LOAD MODAL -->
-    <div id="saveload-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content saveload-modal">
-            <div class="modal-header">
-                <h2>💾 Save / Load Game</h2>
-                <button class="modal-close" id="saveload-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="saveload-tabs">
-                    <button class="saveload-tab-btn active" data-tab="save">Save Game</button>
-                    <button class="saveload-tab-btn" data-tab="load">Load Game</button>
-                </div>
-
-                <!-- Save Tab -->
-                <div id="save-tab" class="saveload-tab-content active">
-                    <div class="saveload-section">
-                        <label>Select Save Slot</label>
-                        <div class="save-slots-grid" id="save-slots-container">
-                            <!-- Save slots will be populated here -->
-                        </div>
-                    </div>
-                    <div class="saveload-section">
-                        <label>Save Name (optional)</label>
-                        <input type="text" id="save-name-input" placeholder="e.g., Week 5 - Before deployment" maxlength="50">
-                    </div>
-                </div>
-
-                <!-- Load Tab -->
-                <div id="load-tab" class="saveload-tab-content">
-                    <div class="saveload-section">
-                        <label>Select Saved Game</label>
-                        <div class="save-slots-grid" id="load-slots-container">
-                            <!-- Save slots will be populated here -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="modal-btn secondary" id="saveload-cancel">Cancel</button>
-                <button class="modal-btn primary" id="saveload-confirm">Save</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- QUIZ MODAL -->
-    <div id="quiz-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content quiz-modal">
-            <div class="modal-header">
-                <h2>🧠 DevOps Quiz</h2>
-                <button class="modal-close" id="quiz-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <!-- Quiz Start Screen -->
-                <div id="quiz-start-screen" class="quiz-screen">
-                    <div class="quiz-intro">
-                        <p>Проверь свои знания DevOps и концепций из The Phoenix Project!</p>
-                        <ul class="quiz-info">
-                            <li><span class="quiz-icon">📝</span> 8 вопросов о DevOps</li>
-                            <li><span class="quiz-icon">⏱️</span> Без лимита времени</li>
-                            <li><span class="quiz-icon">💡</span> С объяснениями после каждого ответа</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <!-- Quiz Question Screen -->
-                <div id="quiz-question-screen" class="quiz-screen" style="display: none;">
-                    <div class="quiz-progress">
-                        <span class="quiz-progress-text">Вопрос <span id="quiz-current-num">1</span> из <span id="quiz-total-num">8</span></span>
-                        <div class="quiz-score">Счёт: <span id="quiz-score">0</span>/<span id="quiz-total">0</span></div>
-                    </div>
-                    <div class="quiz-question" id="quiz-question-text">Загрузка вопроса...</div>
-                    <div class="quiz-options" id="quiz-options-container">
-                        <!-- Options will be inserted here -->
-                    </div>
-                </div>
-
-                <!-- Quiz Result Screen -->
-                <div id="quiz-result-screen" class="quiz-screen" style="display: none;">
-                    <div class="quiz-result">
-                        <div class="quiz-result-icon" id="quiz-result-icon">🏆</div>
-                        <h3 class="quiz-result-title" id="quiz-result-title">Отлично!</h3>
-                        <p class="quiz-result-text" id="quiz-result-text">Ты ответил правильно на 5 из 8 вопросов</p>
-                    </div>
-                </div>
-
-                <!-- Quiz Explanation (shown after answering) -->
-                <div id="quiz-explanation" class="quiz-explanation" style="display: none;">
-                    <div class="explanation-icon" id="explanation-icon">✅</div>
-                    <h4 id="explanation-title">Правильно!</h4>
-                    <p id="explanation-text">Объяснение появится здесь.</p>
-                    <button class="modal-btn primary" id="quiz-next-question">Следующий вопрос</button>
-                </div>
-            </div>
-            <div class="modal-footer" id="quiz-modal-footer">
-                <button class="modal-btn secondary" id="quiz-cancel">Отмена</button>
-                <button class="modal-btn primary" id="quiz-start-btn">Начать викторину</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- EVENT MODAL -->
-    <div id="event-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content event-modal">
-            <div class="modal-header event-header">
-                <div class="event-header-left">
-                    <h2 id="event-title">Event Title</h2>
-                    <div class="event-badges">
-                        <span id="event-type-badge" class="event-type-badge">TECHNICAL</span>
-                        <span id="event-severity-badge" class="event-severity-badge">HIGH</span>
-                    </div>
-                </div>
-                <div class="event-icon" id="event-icon">🐛</div>
-            </div>
-            <div class="modal-body">
-                <p id="event-description" class="event-description">Event description goes here...</p>
-                <div class="event-choices" id="event-choices">
-                    <!-- Choices will be dynamically inserted here -->
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- LEVEL COMPLETE MODAL -->
-    <div id="level-complete-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content level-complete-modal">
-            <div class="modal-header level-complete-header">
-                <h2>🎉 LEVEL COMPLETE!</h2>
-            </div>
-            <div class="modal-body">
-                <div class="level-complete-icon">🏆</div>
-                <h3 id="level-complete-title">Level 1 Complete!</h3>
-                <p id="level-complete-message" class="level-complete-message">All goals achieved!</p>
-
-                <div class="level-complete-stats">
-                    <div class="stat-row">
-                        <span class="stat-label">Week Completed:</span>
-                        <span class="stat-value" id="level-complete-week">1</span>
-                    </div>
-                    <div class="stat-row">
-                        <span class="stat-label">Stability:</span>
-                        <span class="stat-value" id="level-complete-stability">80%</span>
-                    </div>
-                    <div class="stat-row">
-                        <span class="stat-label">Tasks Done:</span>
-                        <span class="stat-value" id="level-complete-tasks">3</span>
-                    </div>
-                </div>
-
-                <div class="level-complete-goals">
-                    <h4>Goals Achieved:</h4>
-                    <ul id="level-complete-goals-list">
-                        <!-- Goals will be listed here -->
-                    </ul>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="modal-btn primary" id="level-complete-advance">Continue to Next Level</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Quiz Toggle Button (in sidebar) -->
-    <button id="quiz-toggle-btn" class="quiz-toggle-btn" title="DevOps Quiz">🧠 Quiz</button>
 
     <!-- Toast Notification Container -->
     <div id="toast-container" class="toast-container"></div>
